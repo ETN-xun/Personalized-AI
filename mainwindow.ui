@@ -13,40 +13,137 @@
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QTextEdit {
+    background: #F8F9FA;
+    border: 1px solid #DEE2E6;
+    border-radius: 8px;
+    padding: 12px;
+    font: 14px &quot;Segoe UI&quot;;
+box-shadow: 0 2px 8px rgba(0,0,0,0.1);  /* 新增投影 */
+}
+
+QLineEdit {
+    border: 2px solid #4A90E2;
+    border-radius: 25px;
+    padding: 0 20px;
+    background: #FFFFFF;
+    selection-background-color: #4A90E2;
+}
+
+QPushButton {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #4A90E2, stop:1 #63B8FF);
+    color: white;
+    border-radius: 25px;
+    font: bold 16px;
+    padding: 5px;
+box-shadow: 0 4px 6px rgba(74,144,226,0.2);
+}
+
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #63B8FF, stop:1 #7EC0EE);
+}
+QLineEdit:focus {
+    border-color: #63B8FF;  /* 聚焦状态颜色变化 */
+}
+QPushButton:pressed {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #3A7BFF, stop:1 #4A90E2);  /* 按压加深渐变 */
+}</string>
+  </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QPushButton" name="pushButtonSend">
-    <property name="geometry">
-     <rect>
-      <x>710</x>
-      <y>500</y>
-      <width>31</width>
-      <height>61</height>
-     </rect>
+   <layout class="QVBoxLayout" name="verticalLayout" stretch="5,1">
+    <property name="topMargin">
+     <number>10</number>
     </property>
-    <property name="text">
-     <string>开始</string>
+    <property name="bottomMargin">
+     <number>10</number>
     </property>
-   </widget>
-   <widget class="QTextEdit" name="textEditChat">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>0</y>
-      <width>771</width>
-      <height>501</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEditInput">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>500</y>
-      <width>711</width>
-      <height>61</height>
-     </rect>
-    </property>
-   </widget>
+    <item>
+     <widget class="QTextEdit" name="textEditChat">
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="horizontalLayout" stretch="5,1">
+      <property name="spacing">
+       <number>15</number>
+      </property>
+      <property name="leftMargin">
+       <number>5</number>
+      </property>
+      <property name="topMargin">
+       <number>5</number>
+      </property>
+      <property name="rightMargin">
+       <number>5</number>
+      </property>
+      <property name="bottomMargin">
+       <number>5</number>
+      </property>
+      <item>
+       <widget class="QLineEdit" name="lineEditInput">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>15</pointsize>
+         </font>
+        </property>
+        <property name="readOnly">
+         <bool>false</bool>
+        </property>
+        <property name="placeholderText">
+         <string>请输入文字</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButtonSend">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>60</width>
+          <height>60</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>-1</pointsize>
+          <italic>false</italic>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>发送</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
@@ -61,5 +158,22 @@
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>lineEditInput</sender>
+   <signal>returnPressed()</signal>
+   <receiver>pushButtonSend</receiver>
+   <slot>click()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>367</x>
+     <y>534</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>687</x>
+     <y>529</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>
