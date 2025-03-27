@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>AiChat</string>
   </property>
   <property name="styleSheet">
    <string notr="true">QTextEdit {
@@ -29,6 +29,7 @@ QLineEdit {
     padding: 0 20px;
     background: #FFFFFF;
     selection-background-color: #4A90E2;
+transition: border-color 0.3s ease;
 }
 
 QPushButton {
@@ -39,11 +40,13 @@ QPushButton {
     font: bold 16px;
     padding: 5px;
 box-shadow: 0 4px 6px rgba(74,144,226,0.2);
+transition: all 0.3s ease;
 }
 
 QPushButton:hover {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
         stop:0 #63B8FF, stop:1 #7EC0EE);
+transform: translateY(-2px);
 }
 QLineEdit:focus {
     border-color: #63B8FF;  /* 聚焦状态颜色变化 */
@@ -51,6 +54,7 @@ QLineEdit:focus {
 QPushButton:pressed {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
         stop:0 #3A7BFF, stop:1 #4A90E2);  /* 按压加深渐变 */
+transform: translateY(1px);
 }</string>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -91,7 +95,7 @@ QPushButton:pressed {
          <bool>true</bool>
         </property>
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
