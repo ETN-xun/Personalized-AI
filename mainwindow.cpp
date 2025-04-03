@@ -1,17 +1,12 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include <QLabel>
-#include <QNetworkReply>
+#include <QPainter>
 #include <QScreen>
 #include <QGuiApplication>
-#include <QMessageBox>
-#include <QJsonDocument>
+#include <QDebug>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QMouseEvent>
-#include <QPropertyAnimation>
-#include <QFont>
-#include <QApplication> // 添加此头文件
+#include <QJsonDocument>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -19,17 +14,18 @@ MainWindow::MainWindow(QWidget *parent)
     m_sizeAnimation(new QPropertyAnimation(this, "geometry")),
     titleBar(new QWidget(this)),
     titleLabel(new QLabel(titleBar)),
-    networkManager(new QNetworkAccessManager(this))
+    networkManager(new QNetworkAccessManager(this)),
+    m_scale(1.0) // 初始化DPI缩放比例
 {
     ui->setupUi(this);
+
+    // 设置透明背景和无边框
+    setAttribute(Qt::WA_TranslucentBackground);
+    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
 
     // 完全移除尺寸限制
     setMinimumSize(0, 0); // 允许最小到0
     setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX); // 最大到系统允许的极限
-
-    // 设置为无边框，支持自定义调整
-    setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
-    setAttribute(Qt::WA_TranslucentBackground);
 
     // 标题栏初始化
     titleBar->setFixedHeight(40);
@@ -39,9 +35,9 @@ MainWindow::MainWindow(QWidget *parent)
         "border-top-right-radius:8px;"
         );
 
+    // 标题栏布局
     QHBoxLayout *titleLayout = new QHBoxLayout(titleBar);
     titleLayout->setContentsMargins(12, 0, 12, 0);
-
     titleLabel->setStyleSheet("color:white; font:bold 16px 'Microsoft Yahei';");
     titleLayout->addWidget(titleLabel);
 
@@ -53,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
         "   color: white;"
         "   font-size: 20px;"
         "   border-radius: 15px;"
+        "   background: transparent;"
         "}"
         "QPushButton:hover {"
         "   background: rgba(255,255,255,30);"
@@ -107,25 +104,29 @@ MainWindow::~MainWindow() {
 }
 
 int MainWindow::getMouseRegion(const QPoint &pos) const {
-    const int PADDING = 5;
+    const int PADDING = static_cast<int>(20 * m_scale); // 触发区域尺寸随DPI变化
     int x = pos.x();
     int y = pos.y();
     int w = width();
     int h = height();
 
-    if(x < PADDING && y < PADDING)          return LEFT_TOP;
-    if(x >= w-PADDING && y >= h-PADDING)    return RIGHT_BOTTOM;
-    if(x < PADDING && y >= h-PADDING)       return LEFT_BOTTOM;
-    if(x >= w-PADDING && y < PADDING)       return RIGHT_TOP;
-    if(x < PADDING)                         return LEFT;
-    if(x >= w-PADDING)                      return RIGHT;
-    if(y < PADDING)                         return UP;
-    if(y >= h-PADDING)                      return DOWN;
+    // 先判断角落区域
+    if (x < PADDING && y < PADDING) return LEFT_TOP;
+    if (x >= w - PADDING && y >= h - PADDING) return RIGHT_BOTTOM;
+    if (x < PADDING && y >= h - PADDING) return LEFT_BOTTOM;
+    if (x >= w - PADDING && y < PADDING) return RIGHT_TOP;
+
+    // 再判断边缘区域
+    if (x < PADDING) return LEFT;
+    if (x >= w - PADDING) return RIGHT;
+    if (y < PADDING) return UP;
+    if (y >= h - PADDING) return DOWN;
+
     return NONE;
 }
 
 void MainWindow::updateCursorShape(const QPoint &pos) {
-    switch(getMouseRegion(pos)) {
+    switch (getMouseRegion(pos)) {
     case LEFT_TOP: case RIGHT_BOTTOM:
         setCursor(Qt::SizeFDiagCursor);
         break;
@@ -174,36 +175,40 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event) {
 
         QRect newGeom = resizeStartGeom;
 
+        // 处理窗口大小调整
         switch (mousePressRegion) {
         case RIGHT_BOTTOM:
-            newGeom.setWidth(resizeStartGeom.width() + delta.x());
-            newGeom.setHeight(resizeStartGeom.height() + delta.y());
+            newGeom.setWidth(newGeom.width() + delta.x());
+            newGeom.setHeight(newGeom.height() + delta.y());
             break;
         case RIGHT:
-            newGeom.setWidth(resizeStartGeom.width() + delta.x());
+            newGeom.setWidth(newGeom.width() + delta.x());
             break;
         case DOWN:
-            newGeom.setHeight(resizeStartGeom.height() + delta.y());
+            newGeom.setHeight(newGeom.height() + delta.y());
             break;
         case LEFT_BOTTOM:
-            newGeom.setLeft(resizeStartGeom.left() + delta.x());
-            newGeom.setHeight(resizeStartGeom.height() + delta.y());
+            newGeom.setLeft(newGeom.left() + delta.x());
+            newGeom.setHeight(newGeom.height() + delta.y());
             break;
         case LEFT_TOP:
-            newGeom.setTopLeft(resizeStartGeom.topLeft() + delta);
+            newGeom.setTopLeft(newGeom.topLeft() + delta);
             break;
         case RIGHT_TOP:
-            newGeom.setTopRight(resizeStartGeom.topRight() + delta);
+            newGeom.setTopRight(newGeom.topRight() + delta);
             break;
         case LEFT:
-            newGeom.setLeft(resizeStartGeom.left() + delta.x());
+            newGeom.setLeft(newGeom.left() + delta.x());
             break;
         case UP:
-            newGeom.setTop(resizeStartGeom.top() + delta.y());
+            newGeom.setTop(newGeom.top() + delta.y());
             break;
         }
 
-        // 完全移除尺寸限制
+        // 更新窗口几何（防止窗口过小）
+        if (newGeom.width() < 200) newGeom.setWidth(200);
+        if (newGeom.height() < 150) newGeom.setHeight(150);
+
         setGeometry(newGeom);
     } else {
         updateCursorShape(event->pos());
@@ -225,8 +230,19 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {
-    // 移除所有强制尺寸限制
     QMainWindow::resizeEvent(event);
+
+    // 更新DPI缩放比例
+    QScreen *screen = windowHandle()->screen();
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+    m_scale = screen->devicePixelRatio();
+#else
+    qreal dpiX = screen->logicalDotsPerInchX();
+    m_scale = dpiX / 96.0;
+#endif
+
+    // 强制更新paintEvent
+    update();
 }
 
 void MainWindow::showEvent(QShowEvent *event) {
@@ -234,6 +250,15 @@ void MainWindow::showEvent(QShowEvent *event) {
     QRect screenRect = screen->availableGeometry();
     QSize initSize(600, 400);
 
+// 计算DPI比例
+#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
+    m_scale = screen->devicePixelRatio();
+#else
+    qreal dpiX = screen->logicalDotsPerInchX();
+    m_scale = dpiX / 96.0;
+#endif
+
+    // 窗口弹出动画
     m_sizeAnimation->setDuration(800);
     m_sizeAnimation->setEasingCurve(QEasingCurve::OutQuint);
 
@@ -250,7 +275,7 @@ void MainWindow::setUserGender(const QString &gender) {
     titleLabel->setText(tr("智能聊天 - 用户性别：%1").arg(gender));
 }
 
-// 实现槽函数
+// 发送按钮点击事件
 void MainWindow::on_pushButtonSend_clicked() {
     QString userInput = ui->lineEditInput->text().trimmed();
     if (userInput.isEmpty()) return;
@@ -258,13 +283,15 @@ void MainWindow::on_pushButtonSend_clicked() {
     ui->textEditChat->append(tr("You: %1").arg(userInput));
     ui->lineEditInput->clear();
 
+    // 创建网络请求
     QUrl url("https://api.deepseek.com/v1/chat/completions");
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     request.setRawHeader("Authorization", "Bearer sk-eea6568b51c74da88e91f32f91485ab9");
 
+    // 构建JSON参数
     QJsonObject json;
-    json["model"] = "deepseek-chat";
+    json["model"] = "deepseek-chat"; // 使用QString隐式转换
     json["temperature"] = 0.5;
     json["max_tokens"] = 2048;
 
@@ -275,23 +302,57 @@ void MainWindow::on_pushButtonSend_clicked() {
     messagesArray.append(messageObj);
     json["messages"] = messagesArray;
 
-    networkManager->post(request, QJsonDocument(json).toJson());
+    // 发送请求
+    QByteArray postData = QJsonDocument(json).toJson();
+    networkManager->post(request, postData);
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onReplyFinished);
 }
 
+// 网络响应回调
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
     if (reply->error() == QNetworkReply::NoError) {
-        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        QByteArray replyData = reply->readAll();
+        QJsonDocument doc = QJsonDocument::fromJson(replyData);
         if (!doc.isNull()) {
             QJsonObject json = doc.object();
             if (json.contains("choices")) {
-                QString response = json["choices"].toArray()[0]
-                                       .toObject()["message"].toObject()["content"].toString();
-                ui->textEditChat->append(tr("Bot: %1").arg(response));
+                QJsonArray choices = json["choices"].toArray();
+                if (!choices.isEmpty()) {
+                    QJsonObject choiceObj = choices[0].toObject();
+                    if (choiceObj.contains("message")) {
+                        QJsonObject messageObj = choiceObj["message"].toObject();
+                        if (messageObj.contains("content")) {
+                            QString response = messageObj["content"].toString();
+                            ui->textEditChat->append(tr("Bot: %1").arg(response));
+                        }
+                    }
+                }
             }
         }
     } else {
         ui->textEditChat->append(tr("Error: %1").arg(reply->errorString()));
     }
     reply->deleteLater();
+}
+
+// 绘制右下角透明蓝色三角形调整柄
+void MainWindow::paintEvent(QPaintEvent *event) {
+    QMainWindow::paintEvent(event); // 先让父类绘制
+
+    int corner_padding = static_cast<int>(20 * m_scale); // 调整区域尺寸随DPI放大
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing); // 反锯齿
+
+    // 定义右下角的蓝色三角形顶点坐标
+    QPointF points[3];
+    points[0] = QPointF(width(), height()); // 右下角顶点
+    points[1] = QPointF(width() - corner_padding, height()); // 左边点（距离右边缘corner_padding）
+    points[2] = QPointF(width(), height() - corner_padding); // 上边点（距离下边缘corner_padding）
+
+    QColor handleColor("#4A90E2");
+    handleColor.setAlpha(150); // 半透明
+    painter.setBrush(handleColor);
+    painter.setPen(Qt::NoPen); // 不显示边框
+
+    painter.drawPolygon(points, 3);
 }

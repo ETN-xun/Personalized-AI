@@ -7,6 +7,9 @@
 #include <QLabel>
 #include <QNetworkReply>
 #include <QPoint>
+#include <QDebug> // 新增
+#include <QPainter>
+#include <QWindow> // 添加此头文件
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -25,6 +28,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
+    void paintEvent(QPaintEvent *event) override; // 新增
 
 private slots:
     void on_pushButtonSend_clicked();
@@ -50,4 +54,5 @@ private:
     QWidget *titleBar;
     QLabel *titleLabel;
     QPropertyAnimation *m_sizeAnimation;
+    QWidget *m_resizeHandle; // 新增调整柄
 };
