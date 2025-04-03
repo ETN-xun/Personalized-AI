@@ -1,13 +1,12 @@
-// mainwindow.h
 #pragma once
 #include <QMainWindow>
 #include <QNetworkAccessManager>
 #include <QScreen>
 #include <QMouseEvent>
 #include <QPropertyAnimation>
-#include <QLabel>                // 添加
-#include <QNetworkReply>          // 添加
-#include <QPropertyAnimation>     // 添加
+#include <QLabel>
+#include <QNetworkReply>
+#include <QPoint>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,11 +31,7 @@ private slots:
     void onReplyFinished(QNetworkReply *reply);
 
 private:
-    enum Direction {
-        UP, DOWN, LEFT, RIGHT,
-        LEFT_TOP, LEFT_BOTTOM,
-        RIGHT_TOP, RIGHT_BOTTOM, NONE
-    };
+    enum Direction { UP, DOWN, LEFT, RIGHT, LEFT_TOP, LEFT_BOTTOM, RIGHT_TOP, RIGHT_BOTTOM, NONE };
     int getMouseRegion(const QPoint &pos) const;
     void updateCursorShape(const QPoint &pos);
 
@@ -45,7 +40,7 @@ private:
     QString apiKey = "sk-eea6568b51c74da88e91f32f91485ab9";
     QString userGender = "未选择";
 
-    // Window control
+    // 窗口控制
     Direction mousePressRegion = NONE;
     QPoint resizeStartPos;
     QRect resizeStartGeom;

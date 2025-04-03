@@ -15,61 +15,14 @@
   </property>
   <property name="styleSheet">
    <string notr="true">
-    /* 窗口背景为白色 */
-    QMainWindow {
-        background-color: white;
-    }
-
-    /* 聊天记录区域样式 */
-    QTextEdit#textEditChat {
-        background: #F8F9FA;
-        border: 1px solid #CED4DA;
-        border-radius: 8px;
-        padding: 12px;
-        font: 14px "Segoe UI";
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-
-    /* 输入框样式 */
-    QLineEdit#lineEditInput {
-        border: 2px solid #4A90E2;
-        border-radius: 25px;
-        padding: 0 20px;
-        background: #FFFFFF;
-        selection-background-color: #4A90E2;
-        transition: border-color 0.3s ease;
-    }
-    QLineEdit:focus#lineEditInput {
-        border-color: #63B8FF;
-    }
-
-    /* 发送按钮样式 */
-    QPushButton#pushButtonSend {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4A90E2, stop:1 #63B8FF);
-        color: white;
-        border-radius: 25px;
-        font: bold 16px;
-        padding: 5px;
-        box-shadow: 0 4px 6px rgba(74,144,226,0.2);
-        transition: all 0.3s ease;
-    }
-    QPushButton#pushButtonSend:hover {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #63B8FF, stop:1 #7EC0EE);
-        transform: translateY(-2px);
-    }
-    QPushButton#pushButtonSend:pressed {
-        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3A7BFF, stop:1 #4A90E2);
-        transform: translateY(1px);
-    }
+    /* 完全移除强制性样式 */
+    QMainWindow { background-color: white; }
    </string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout" stretch="5,1">
-    <property name="topMargin">
-     <number>10</number>
-    </property>
-    <property name="bottomMargin">
-     <number>10</number>
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <property name="spacing">
+     <number>20</number>
     </property>
     <item>
      <widget class="QTextEdit" name="textEditChat">
@@ -79,24 +32,29 @@
       <property name="readOnly">
        <bool>true</bool>
       </property>
+      <property name="font">
+       <font>
+        <pointsize>24</pointsize> <!-- 直接设置字体大小 -->
+       </font>
+      </property>
      </widget>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="horizontalLayout" stretch="5,1">
+     <layout class="QHBoxLayout" name="horizontalLayout">
       <property name="spacing">
-       <number>15</number>
+       <number>20</number>
       </property>
       <item>
        <widget class="QLineEdit" name="lineEditInput">
         <property name="minimumSize">
          <size>
-          <width>300</width>
+          <width>400</width>
           <height>60</height>
          </size>
         </property>
         <property name="font">
          <font>
-          <pointsize>14</pointsize>
+          <pointsize>18</pointsize> <!-- 更大的输入框字体 -->
          </font>
         </property>
         <property name="placeholderText">
@@ -108,11 +66,17 @@
        <widget class="QPushButton" name="pushButtonSend">
         <property name="font">
          <font>
-          <pointsize>14</pointsize>
+          <pointsize>18</pointsize> <!-- 发送按钮字体更大 -->
          </font>
         </property>
         <property name="text">
          <string>发送</string>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>150</width>
+          <height>60</height>
+         </size>
         </property>
        </widget>
       </item>
@@ -123,7 +87,6 @@
   <widget class="QMenuBar" name="menubar"/>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
- <resources/>
  <connections>
   <connection>
    <sender>lineEditInput</sender>

@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-
 #include <QLabel>
 #include <QNetworkReply>
 #include <QScreen>
@@ -11,6 +10,8 @@
 #include <QJsonArray>
 #include <QMouseEvent>
 #include <QPropertyAnimation>
+#include <QFont>
+#include <QApplication> // 添加此头文件
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -20,16 +21,15 @@ MainWindow::MainWindow(QWidget *parent)
     titleLabel(new QLabel(titleBar)),
     networkManager(new QNetworkAccessManager(this))
 {
-#if (QT_VERSION >= QT_VERSION_CHECK(6,0,0))
-    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::Floor);
-#endif
-
     ui->setupUi(this);
 
-    // 无边框窗口设置
+    // 完全移除尺寸限制
+    setMinimumSize(0, 0); // 允许最小到0
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX); // 最大到系统允许的极限
+
+    // 设置为无边框，支持自定义调整
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
     setAttribute(Qt::WA_TranslucentBackground);
-    setMinimumSize(400, 300);
 
     // 标题栏初始化
     titleBar->setFixedHeight(40);
@@ -42,19 +42,26 @@ MainWindow::MainWindow(QWidget *parent)
     QHBoxLayout *titleLayout = new QHBoxLayout(titleBar);
     titleLayout->setContentsMargins(12, 0, 12, 0);
 
-    titleLabel->setStyleSheet("color:white; font:bold 18px 'Microsoft Yahei';");
+    titleLabel->setStyleSheet("color:white; font:bold 16px 'Microsoft Yahei';");
     titleLayout->addWidget(titleLabel);
 
     // 关闭按钮
     QPushButton *closeBtn = new QPushButton("×", titleBar);
-    closeBtn->setFixedSize(30,30);
-    closeBtn->setStyleSheet(R"(
-        QPushButton{color:white; font:bold 20px; border-radius:15px;}
-        QPushButton:hover{background:rgba(255,255,255,30);}
-        QPushButton:pressed{background:rgba(255,255,255,60);}
-    )");
+    closeBtn->setFixedSize(30, 30);
+    closeBtn->setStyleSheet(
+        "QPushButton {"
+        "   color: white;"
+        "   font-size: 20px;"
+        "   border-radius: 15px;"
+        "}"
+        "QPushButton:hover {"
+        "   background: rgba(255,255,255,30);"
+        "}"
+        "QPushButton:pressed {"
+        "   background: rgba(255,255,255,60);"
+        "}"
+        );
     connect(closeBtn, &QPushButton::clicked, this, &QWidget::close);
-
     titleLayout->addStretch();
     titleLayout->addWidget(closeBtn);
 
@@ -62,9 +69,9 @@ MainWindow::MainWindow(QWidget *parent)
     QWidget *central = ui->centralwidget;
     QVBoxLayout *mainLayout = qobject_cast<QVBoxLayout*>(central->layout());
     mainLayout->insertWidget(0, titleBar);
-    mainLayout->setContentsMargins(2,2,2,2);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
 
-    // 输入框样式
+    // 输入框和发送按钮样式
     ui->lineEditInput->setStyleSheet(R"(
         QLineEdit{
             background:white;
@@ -78,7 +85,6 @@ MainWindow::MainWindow(QWidget *parent)
         }
     )");
 
-    // 发送按钮样式
     ui->pushButtonSend->setStyleSheet(R"(
         QPushButton{
             background:#4A90E2;
@@ -93,18 +99,14 @@ MainWindow::MainWindow(QWidget *parent)
         }
     )");
 
-    // 关联回车发送
-    connect(ui->lineEditInput, &QLineEdit::returnPressed,
-            ui->pushButtonSend, &QPushButton::click);
+    connect(ui->lineEditInput, &QLineEdit::returnPressed, ui->pushButtonSend, &QPushButton::click);
 }
 
-MainWindow::~MainWindow()
-{
+MainWindow::~MainWindow() {
     delete ui;
 }
 
-int MainWindow::getMouseRegion(const QPoint &pos) const
-{
+int MainWindow::getMouseRegion(const QPoint &pos) const {
     const int PADDING = 5;
     int x = pos.x();
     int y = pos.y();
@@ -122,24 +124,26 @@ int MainWindow::getMouseRegion(const QPoint &pos) const
     return NONE;
 }
 
-void MainWindow::updateCursorShape(const QPoint &pos)
-{
+void MainWindow::updateCursorShape(const QPoint &pos) {
     switch(getMouseRegion(pos)) {
     case LEFT_TOP: case RIGHT_BOTTOM:
-        setCursor(Qt::SizeFDiagCursor); break;
+        setCursor(Qt::SizeFDiagCursor);
+        break;
     case LEFT_BOTTOM: case RIGHT_TOP:
-        setCursor(Qt::SizeBDiagCursor); break;
+        setCursor(Qt::SizeBDiagCursor);
+        break;
     case LEFT: case RIGHT:
-        setCursor(Qt::SizeHorCursor); break;
+        setCursor(Qt::SizeHorCursor);
+        break;
     case UP: case DOWN:
-        setCursor(Qt::SizeVerCursor); break;
+        setCursor(Qt::SizeVerCursor);
+        break;
     default:
         setCursor(Qt::ArrowCursor);
     }
 }
 
-void MainWindow::mousePressEvent(QMouseEvent *event)
-{
+void MainWindow::mousePressEvent(QMouseEvent *event) {
     QPoint pos;
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
     pos = event->globalPos();
@@ -151,16 +155,16 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
     resizeStartPos = pos;
     resizeStartGeom = geometry();
 
-    if(mousePressRegion == NONE && event->pos().y() < titleBar->height()) {
+    // 标题栏拖动
+    if (mousePressRegion == NONE && event->pos().y() < titleBar->height()) {
         dragPos = pos - frameGeometry().topLeft();
         m_bDrag = true;
         event->accept();
     }
 }
 
-void MainWindow::mouseMoveEvent(QMouseEvent *event)
-{
-    if(mousePressRegion != NONE) {
+void MainWindow::mouseMoveEvent(QMouseEvent *event) {
+    if (mousePressRegion != NONE) {
         QPoint delta;
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
         delta = event->globalPos() - resizeStartPos;
@@ -170,7 +174,7 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
 
         QRect newGeom = resizeStartGeom;
 
-        switch(mousePressRegion) {
+        switch (mousePressRegion) {
         case RIGHT_BOTTOM:
             newGeom.setWidth(resizeStartGeom.width() + delta.x());
             newGeom.setHeight(resizeStartGeom.height() + delta.y());
@@ -199,15 +203,11 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
             break;
         }
 
-        if(newGeom.width() < minimumWidth())
-            newGeom.setWidth(minimumWidth());
-        if(newGeom.height() < minimumHeight())
-            newGeom.setHeight(minimumHeight());
-
+        // 完全移除尺寸限制
         setGeometry(newGeom);
     } else {
         updateCursorShape(event->pos());
-        if(m_bDrag) {
+        if (m_bDrag) {
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
             move(event->globalPos() - dragPos);
 #else
@@ -218,38 +218,26 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
     }
 }
 
-void MainWindow::mouseReleaseEvent(QMouseEvent *event)
-{
+void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     mousePressRegion = NONE;
     m_bDrag = false;
     setCursor(Qt::ArrowCursor);
 }
 
-void MainWindow::resizeEvent(QResizeEvent *event)
-{
-    QScreen *screen = QGuiApplication::primaryScreen();
-    QRect available = screen->availableGeometry();
-    QRect current = geometry();
-
-    if(current.left() < available.left()) move(available.left(), y());
-    if(current.top() < available.top()) move(x(), available.top());
-    if(current.right() > available.right()) move(available.right()-width(), y());
-    if(current.bottom() > available.bottom()) move(x(), available.bottom()-height());
-
+void MainWindow::resizeEvent(QResizeEvent *event) {
+    // 移除所有强制尺寸限制
     QMainWindow::resizeEvent(event);
 }
 
-void MainWindow::showEvent(QShowEvent *event)
-{
+void MainWindow::showEvent(QShowEvent *event) {
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenRect = screen->availableGeometry();
+    QSize initSize(600, 400);
 
     m_sizeAnimation->setDuration(800);
     m_sizeAnimation->setEasingCurve(QEasingCurve::OutQuint);
 
-    QSize initSize(600, 450);
     QPoint centerPos = screenRect.center() - QPoint(initSize.width()/2, initSize.height()/2);
-
     m_sizeAnimation->setStartValue(QRect(centerPos.x(), screenRect.bottom(), 0, 0));
     m_sizeAnimation->setEndValue(QRect(centerPos, initSize));
     m_sizeAnimation->start();
@@ -257,16 +245,15 @@ void MainWindow::showEvent(QShowEvent *event)
     QMainWindow::showEvent(event);
 }
 
-void MainWindow::setUserGender(const QString &gender)
-{
+void MainWindow::setUserGender(const QString &gender) {
     userGender = gender;
     titleLabel->setText(tr("智能聊天 - 用户性别：%1").arg(gender));
 }
 
-void MainWindow::on_pushButtonSend_clicked()
-{
+// 实现槽函数
+void MainWindow::on_pushButtonSend_clicked() {
     QString userInput = ui->lineEditInput->text().trimmed();
-    if(userInput.isEmpty()) return;
+    if (userInput.isEmpty()) return;
 
     ui->textEditChat->append(tr("You: %1").arg(userInput));
     ui->lineEditInput->clear();
@@ -289,17 +276,15 @@ void MainWindow::on_pushButtonSend_clicked()
     json["messages"] = messagesArray;
 
     networkManager->post(request, QJsonDocument(json).toJson());
-    connect(networkManager, &QNetworkAccessManager::finished,
-            this, &MainWindow::onReplyFinished);
+    connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onReplyFinished);
 }
 
-void MainWindow::onReplyFinished(QNetworkReply *reply)
-{
-    if(reply->error() == QNetworkReply::NoError) {
+void MainWindow::onReplyFinished(QNetworkReply *reply) {
+    if (reply->error() == QNetworkReply::NoError) {
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-        if(!doc.isNull()) {
+        if (!doc.isNull()) {
             QJsonObject json = doc.object();
-            if(json.contains("choices")) {
+            if (json.contains("choices")) {
                 QString response = json["choices"].toArray()[0]
                                        .toObject()["message"].toObject()["content"].toString();
                 ui->textEditChat->append(tr("Bot: %1").arg(response));
