@@ -14,6 +14,7 @@ class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
+    void setUserGender(const QString &gender); // 新增方法
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
@@ -22,6 +23,7 @@ private slots:
     void onReplyFinished(QNetworkReply *reply);
 
 private:
+    QString userGender; // 新增成员变量
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     QString apiKey;

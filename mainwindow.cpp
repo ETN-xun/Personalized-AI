@@ -5,13 +5,18 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    userGender = "未选择"; // 默认值
     ui->setupUi(this);
     networkManager = new QNetworkAccessManager(this);
     apiKey = "sk-eea6568b51c74da88e91f32f91485ab9"; // 替换为你的API密钥
 
     connect(ui->pushButtonSend, &QPushButton::clicked, this, &MainWindow::on_pushButtonSend_clicked);
 }
-
+// 新增方法实现：
+void MainWindow::setUserGender(const QString &gender) {
+    userGender = gender;
+    setWindowTitle("智能聊天 - 用户性别：" + gender);
+}
 MainWindow::~MainWindow()
 {
     delete ui;
@@ -63,7 +68,6 @@ void MainWindow::onReplyFinished(QNetworkReply *reply)
         // 解析 JSON 响应
         QJsonDocument jsonResponse = QJsonDocument::fromJson(responseContent);
         if (jsonResponse.isNull()) {
-            ui->textEditChat->append("Error: Invalid JSON response");
             return;
         }
 
