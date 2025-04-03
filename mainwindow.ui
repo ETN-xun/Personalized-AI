@@ -14,48 +14,54 @@
    <string>AiChat</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">QTextEdit {
-    background: #F8F9FA;
-    border: 1px solid #DEE2E6;
-    border-radius: 8px;
-    padding: 12px;
-    font: 14px &quot;Segoe UI&quot;;
-box-shadow: 0 2px 8px rgba(0,0,0,0.1);  /* 新增投影 */
-}
+   <string notr="true">
+    /* 窗口背景为白色 */
+    QMainWindow {
+        background-color: white;
+    }
 
-QLineEdit {
-    border: 2px solid #4A90E2;
-    border-radius: 25px;
-    padding: 0 20px;
-    background: #FFFFFF;
-    selection-background-color: #4A90E2;
-transition: border-color 0.3s ease;
-}
+    /* 聊天记录区域样式 */
+    QTextEdit#textEditChat {
+        background: #F8F9FA;
+        border: 1px solid #CED4DA;
+        border-radius: 8px;
+        padding: 12px;
+        font: 14px "Segoe UI";
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
 
-QPushButton {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #4A90E2, stop:1 #63B8FF);
-    color: white;
-    border-radius: 25px;
-    font: bold 16px;
-    padding: 5px;
-box-shadow: 0 4px 6px rgba(74,144,226,0.2);
-transition: all 0.3s ease;
-}
+    /* 输入框样式 */
+    QLineEdit#lineEditInput {
+        border: 2px solid #4A90E2;
+        border-radius: 25px;
+        padding: 0 20px;
+        background: #FFFFFF;
+        selection-background-color: #4A90E2;
+        transition: border-color 0.3s ease;
+    }
+    QLineEdit:focus#lineEditInput {
+        border-color: #63B8FF;
+    }
 
-QPushButton:hover {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #63B8FF, stop:1 #7EC0EE);
-transform: translateY(-2px);
-}
-QLineEdit:focus {
-    border-color: #63B8FF;  /* 聚焦状态颜色变化 */
-}
-QPushButton:pressed {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #3A7BFF, stop:1 #4A90E2);  /* 按压加深渐变 */
-transform: translateY(1px);
-}</string>
+    /* 发送按钮样式 */
+    QPushButton#pushButtonSend {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #4A90E2, stop:1 #63B8FF);
+        color: white;
+        border-radius: 25px;
+        font: bold 16px;
+        padding: 5px;
+        box-shadow: 0 4px 6px rgba(74,144,226,0.2);
+        transition: all 0.3s ease;
+    }
+    QPushButton#pushButtonSend:hover {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #63B8FF, stop:1 #7EC0EE);
+        transform: translateY(-2px);
+    }
+    QPushButton#pushButtonSend:pressed {
+        background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #3A7BFF, stop:1 #4A90E2);
+        transform: translateY(1px);
+    }
+   </string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout" stretch="5,1">
@@ -67,6 +73,9 @@ transform: translateY(1px);
     </property>
     <item>
      <widget class="QTextEdit" name="textEditChat">
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAlwaysOff</enum>
+      </property>
       <property name="readOnly">
        <bool>true</bool>
       </property>
@@ -77,29 +86,8 @@ transform: translateY(1px);
       <property name="spacing">
        <number>15</number>
       </property>
-      <property name="leftMargin">
-       <number>5</number>
-      </property>
-      <property name="topMargin">
-       <number>5</number>
-      </property>
-      <property name="rightMargin">
-       <number>5</number>
-      </property>
-      <property name="bottomMargin">
-       <number>5</number>
-      </property>
       <item>
        <widget class="QLineEdit" name="lineEditInput">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
         <property name="minimumSize">
          <size>
           <width>300</width>
@@ -108,11 +96,8 @@ transform: translateY(1px);
         </property>
         <property name="font">
          <font>
-          <pointsize>15</pointsize>
+          <pointsize>14</pointsize>
          </font>
-        </property>
-        <property name="readOnly">
-         <bool>false</bool>
         </property>
         <property name="placeholderText">
          <string>请输入文字</string>
@@ -121,23 +106,9 @@ transform: translateY(1px);
       </item>
       <item>
        <widget class="QPushButton" name="pushButtonSend">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize">
-         <size>
-          <width>60</width>
-          <height>60</height>
-         </size>
-        </property>
         <property name="font">
          <font>
-          <pointsize>-1</pointsize>
-          <italic>false</italic>
-          <bold>true</bold>
+          <pointsize>14</pointsize>
          </font>
         </property>
         <property name="text">
@@ -149,16 +120,7 @@ transform: translateY(1px);
     </item>
    </layout>
   </widget>
-  <widget class="QMenuBar" name="menubar">
-   <property name="geometry">
-    <rect>
-     <x>0</x>
-     <y>0</y>
-     <width>800</width>
-     <height>18</height>
-    </rect>
-   </property>
-  </widget>
+  <widget class="QMenuBar" name="menubar"/>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
@@ -168,16 +130,6 @@ transform: translateY(1px);
    <signal>returnPressed()</signal>
    <receiver>pushButtonSend</receiver>
    <slot>click()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>367</x>
-     <y>534</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>687</x>
-     <y>529</y>
-    </hint>
-   </hints>
   </connection>
  </connections>
 </ui>
