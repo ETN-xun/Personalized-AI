@@ -110,6 +110,10 @@ int MainWindow::getMouseRegion(const QPoint &pos) const {
     int w = width();
     int h = height();
 
+    if (y < titleBar->height()) {
+        return NONE;
+    }
+
     // 先判断角落区域
     if (x < PADDING && y < PADDING) return LEFT_TOP;
     if (x >= w - PADDING && y >= h - PADDING) return RIGHT_BOTTOM;
@@ -151,6 +155,13 @@ void MainWindow::mousePressEvent(QMouseEvent *event) {
 #else
     pos = event->globalPosition().toPoint();
 #endif
+
+    if (event->pos().y() < titleBar->height()) {
+        dragPos = pos - frameGeometry().topLeft();
+        m_bDrag = true;
+        event->accept();
+        return; // 直接返回避免进入尺寸调整逻辑
+    }
 
     mousePressRegion = static_cast<Direction>(getMouseRegion(event->pos()));
     resizeStartPos = pos;

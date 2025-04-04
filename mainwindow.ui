@@ -34,7 +34,7 @@
       </property>
       <property name="font">
        <font>
-        <pointsize>24</pointsize> <!-- 直接设置字体大小 -->
+        <pointsize>18</pointsize> <!-- 直接设置字体大小 -->
        </font>
       </property>
      </widget>
