@@ -7,9 +7,11 @@
 #include <QLabel>
 #include <QNetworkReply>
 #include <QPoint>
-#include <QDebug> // 新增
-#include <QPainter>
-#include <QWindow> // 添加此头文件
+#include <QDebug>
+#include <QWidget>
+#include <QPushButton>
+#include <QWindow>
+#include <QtGui/qwindowdefs.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -17,10 +19,22 @@ QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
+    Q_PROPERTY(double rotationAngle READ rotationAngle WRITE setRotationAngle)
+
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void setUserGender(const QString &gender);
+
+    // 属性读写函数
+    double rotationAngle() const { return m_rotationAngle; }
+    void setRotationAngle(double angle) {
+        m_rotationAngle = angle;
+        update();
+        if (loadIndicator) {
+            loadIndicator->update();
+        }
+    }
 
 protected:
     void showEvent(QShowEvent *event) override;
@@ -28,7 +42,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
-    void paintEvent(QPaintEvent *event) override; // 新增
+    void paintEvent(QPaintEvent *event) override;
 
 private slots:
     void on_pushButtonSend_clicked();
@@ -53,6 +67,11 @@ private:
     qreal m_scale = 1.0;
     QWidget *titleBar;
     QLabel *titleLabel;
+    QPushButton *closeBtn;
+    QPropertyAnimation *rotationAnimation;
     QPropertyAnimation *m_sizeAnimation;
-    QWidget *m_resizeHandle; // 新增调整柄
+    QLabel *loadIndicator;
+    bool isLoading = false;
+
+    double m_rotationAngle = 0.0;
 };
