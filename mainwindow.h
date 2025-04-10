@@ -47,6 +47,7 @@ protected:
 private slots:
     void on_pushButtonSend_clicked();
     void onReplyFinished(QNetworkReply *reply);
+    void toggleMaximize();
 
 private:
     enum Direction { UP, DOWN, LEFT, RIGHT, LEFT_TOP, LEFT_BOTTOM, RIGHT_TOP, RIGHT_BOTTOM, NONE };
@@ -64,10 +65,12 @@ private:
     QRect resizeStartGeom;
     bool m_bDrag = false;
     QPoint dragPos;
-    qreal m_scale = 1.0;
+    qreal m_scale = 1.0; // 初始化为默认值
     QWidget *titleBar;
     QLabel *titleLabel;
     QPushButton *closeBtn;
+    QPushButton *minBtn;
+    QPushButton *maxBtn;
     QPropertyAnimation *rotationAnimation;
     QPropertyAnimation *m_sizeAnimation;
     QLabel *loadIndicator;

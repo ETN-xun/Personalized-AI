@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QWindow>
 #include <QHBoxLayout>
+#include <QApplication>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -20,10 +21,24 @@ MainWindow::MainWindow(QWidget *parent)
     rotationAnimation(new QPropertyAnimation(this, "rotationAngle")),
     m_sizeAnimation(new QPropertyAnimation(this, "geometry")),
     loadIndicator(new QLabel(titleBar)),
+    minBtn(nullptr),
+    maxBtn(nullptr),
     m_rotationAngle(0.0),
-    isLoading(false)
+    isLoading(false),
+    m_scale(1.0) // 初始化
 {
     ui->setupUi(this);
+
+    // 首次计算屏幕缩放比例
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (screen) {
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+        m_scale = screen->devicePixelRatio();
+#else
+        qreal dpiX = screen->logicalDotsPerInchX();
+        m_scale = dpiX / 96.0;
+#endif
+    }
 
     setAttribute(Qt::WA_TranslucentBackground);
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowSystemMenuHint);
@@ -36,23 +51,32 @@ MainWindow::MainWindow(QWidget *parent)
         );
 
     // 标题栏布局
-    QHBoxLayout *titleLayout = new QHBoxLayout(titleBar); // 局部变量
+    QHBoxLayout *titleLayout = new QHBoxLayout(titleBar);
+    titleLayout->setSpacing(0);
     titleLayout->setContentsMargins(12 * m_scale, 0, 12 * m_scale, 0);
-    titleLayout->setSpacing(10 * m_scale);
 
+    // 标题和加载指示器
     titleLabel->setStyleSheet("color:white; font:bold 14px 'Microsoft YaHei';");
     titleLayout->addWidget(titleLabel);
 
-    // 加载指示器
+    // 加载指示器设置
     loadIndicator->setFixedSize(18 * m_scale, 18 * m_scale);
-    loadIndicator->setScaledContents(true);
+    loadIndicator->setAlignment(Qt::AlignVCenter);
     loadIndicator->setStyleSheet("background: transparent;");
     loadIndicator->clear();
+    titleLayout->addWidget(loadIndicator); // 追加到标题右侧
 
-    // 关闭按钮
+    // 按钮分隔与右对齐
+    titleLayout->addSpacing(15 * m_scale); // 分隔指示器和按钮
+    titleLayout->addStretch(); // 伸展让按钮右对齐
+
+    // 窗口控制按钮
+    minBtn = new QPushButton("-", titleBar); // 最小化符号更改为"-"
+    maxBtn = new QPushButton("□", titleBar); // 初始符号为方框
     closeBtn = new QPushButton("×", titleBar);
-    closeBtn->setFixedSize(22 * m_scale, 22 * m_scale);
-    closeBtn->setStyleSheet(
+
+    // 统一按钮样式
+    auto buttonStyle = QString(
         "QPushButton {"
         "   color: white;"
         "   font-size: 16px;"
@@ -62,62 +86,32 @@ MainWindow::MainWindow(QWidget *parent)
         "QPushButton:hover { background: rgba(255,255,255,30); }"
         "QPushButton:pressed { background: rgba(255,255,255,60); }"
         );
-    connect(closeBtn, &QPushButton::clicked, this, &QWidget::close);
+    minBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+    maxBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+    closeBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+    minBtn->setStyleSheet(buttonStyle);
+    maxBtn->setStyleSheet(buttonStyle);
+    closeBtn->setStyleSheet(buttonStyle);
 
-    // 布局调整
-    titleLayout->addStretch();
-    titleLayout->addSpacing(15 * m_scale);
-    titleLayout->addWidget(loadIndicator);
+    // 添加按钮到标题栏布局
+    titleLayout->addWidget(minBtn);
+    titleLayout->addWidget(maxBtn);
     titleLayout->addWidget(closeBtn);
-    titleLayout->setAlignment(loadIndicator, Qt::AlignVCenter);
+    titleLayout->setAlignment(minBtn, Qt::AlignVCenter);
+    titleLayout->setAlignment(maxBtn, Qt::AlignVCenter);
     titleLayout->setAlignment(closeBtn, Qt::AlignVCenter);
-
-    // 连接动画更新
-    connect(rotationAnimation, &QVariantAnimation::valueChanged, [this]() {
-        if (!isLoading) {
-            loadIndicator->clear();
-            return;
-        }
-
-        QPixmap pixmap(18 * m_scale, 18 * m_scale);
-        pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);
-        painter.setRenderHint(QPainter::Antialiasing);
-
-        const int indicatorSize = 18 * static_cast<int>(m_scale);
-        const int lineWidth = 2;
-
-        // 绘制蓝色外环
-        painter.setPen(QPen(QColor("#4A90E2"), lineWidth));
-        painter.drawEllipse(0, 0, indicatorSize, indicatorSize);
-
-        // 黄色扇形旋转
-        painter.setPen(QPen(QColor("#FFD700"), lineWidth));
-        painter.drawArc(
-            0, 0, indicatorSize, indicatorSize,
-            static_cast<int>(rotationAngle() * 16),
-            -90 * 16
-            );
-
-        loadIndicator->setPixmap(pixmap);
-    });
 
     // 主布局设置
     QWidget *central = ui->centralwidget;
     QVBoxLayout *mainLayout = qobject_cast<QVBoxLayout*>(central->layout());
     mainLayout->insertWidget(0, titleBar);
     mainLayout->setContentsMargins(0, 0, 0, 0);
+    mainLayout->setSpacing(0); // 消除中间区域与输入栏的空白
 
-    // 窗口弹出动画
-    m_sizeAnimation->setDuration(800);
-    m_sizeAnimation->setEasingCurve(QEasingCurve::OutQuint);
-
-    // 旋转动画配置
-    rotationAnimation->setDuration(1000);
-    rotationAnimation->setStartValue(0);
-    rotationAnimation->setEndValue(360);
-    rotationAnimation->setLoopCount(-1);
-    rotationAnimation->setEasingCurve(QEasingCurve::Linear);
+    // 连接按钮信号
+    connect(minBtn, &QPushButton::clicked, this, &QMainWindow::showMinimized);
+    connect(maxBtn, &QPushButton::clicked, this, &MainWindow::toggleMaximize);
+    connect(closeBtn, &QPushButton::clicked, this, &QWidget::close);
 
     // 输入框和发送按钮样式
     ui->lineEditInput->setStyleSheet(R"(
@@ -141,28 +135,59 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:pressed { background: #3A7BFF; }
     )");
     connect(ui->lineEditInput, &QLineEdit::returnPressed, ui->pushButtonSend, &QPushButton::click);
+
+    // 加载指示器动画
+    connect(rotationAnimation, &QVariantAnimation::valueChanged, [this]() {
+        if (!isLoading) {
+            loadIndicator->clear();
+            return;
+        }
+
+        QPixmap pixmap(18 * m_scale, 18 * m_scale);
+        pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);
+        painter.setRenderHint(QPainter::Antialiasing);
+
+        const int indicatorSize = 18 * static_cast<int>(m_scale);
+        const int lineWidth = 2;
+
+        // 优化加载指示器效果
+        painter.setPen(QPen(QColor("#4A90E2"), lineWidth));
+        painter.drawEllipse(0, 0, indicatorSize, indicatorSize);
+
+        painter.setPen(QPen(QColor("#FFD700"), lineWidth));
+        // 调整旋转跨度为-270度（形成旋转的扇形）
+        painter.drawArc(0, 0, indicatorSize, indicatorSize,
+                        static_cast<int>(rotationAngle() * 16),
+                        -270 * 16); // 修改跨度参数
+
+        loadIndicator->setPixmap(pixmap);
+    });
+
+    // 初始化动画参数
+    rotationAnimation->setDuration(1000);
+    rotationAnimation->setStartValue(0);
+    rotationAnimation->setEndValue(360);
+    rotationAnimation->setLoopCount(-1);
+    rotationAnimation->setEasingCurve(QEasingCurve::Linear);
 }
 
 MainWindow::~MainWindow() {
     delete ui;
     delete loadIndicator;
     delete closeBtn;
+    delete minBtn;
+    delete maxBtn;
     delete rotationAnimation;
     delete m_sizeAnimation;
 }
 
 void MainWindow::showEvent(QShowEvent *event) {
     QMainWindow::showEvent(event);
+
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenRect = screen->availableGeometry();
     QSize initSize(600, 400);
-
-#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
-    m_scale = screen->devicePixelRatio();
-#else
-    qreal dpiX = screen->logicalDotsPerInchX();
-    m_scale = dpiX / 96.0;
-#endif
 
     m_sizeAnimation->setStartValue(QRect(
         (screenRect.width() - initSize.width()) / 2,
@@ -205,7 +230,6 @@ void MainWindow::on_pushButtonSend_clicked() {
                          }
                      }}
     };
-
     networkManager->post(request, QJsonDocument(json).toJson());
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onReplyFinished);
 }
@@ -213,8 +237,8 @@ void MainWindow::on_pushButtonSend_clicked() {
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
     isLoading = false;
     rotationAnimation->stop();
-    setRotationAngle(0.0);
     loadIndicator->clear();
+    setRotationAngle(0.0);
 
     if (reply->error() == QNetworkReply::NoError) {
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
@@ -247,32 +271,6 @@ void MainWindow::paintEvent(QPaintEvent *event) {
     painter.setBrush(handleColor);
     painter.setPen(Qt::NoPen);
     painter.drawPolygon(points, 3);
-}
-
-// 其他函数保持不变，但修正resizeEvent中的问题：
-
-void MainWindow::resizeEvent(QResizeEvent *event) {
-    QMainWindow::resizeEvent(event);
-
-    QScreen *screen = windowHandle()->screen();
-#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
-    m_scale = screen->devicePixelRatio();
-#else
-    qreal dpiX = screen->logicalDotsPerInchX();
-    m_scale = dpiX / 96.0;
-#endif
-
-    // 动态调整标题栏部件
-    titleBar->setFixedHeight(40 * m_scale);
-    loadIndicator->setFixedSize(18 * m_scale, 18 * m_scale);
-    closeBtn->setFixedSize(22 * m_scale, 22 * m_scale);
-
-    // 获取标题栏布局并更新参数
-    auto *titleLayout = qobject_cast<QHBoxLayout*>(titleBar->layout());
-    if (titleLayout) {
-        titleLayout->setContentsMargins(12 * m_scale, 0, 12 * m_scale, 0);
-        titleLayout->setSpacing(10 * m_scale);
-    }
 }
 
 int MainWindow::getMouseRegion(const QPoint &pos) const {
@@ -403,7 +401,47 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     setCursor(Qt::ArrowCursor);
 }
 
+void MainWindow::toggleMaximize() {
+    if (isMaximized()) {
+        showNormal();
+        maxBtn->setText("□"); // 恢复为方框
+    } else {
+        showMaximized();
+        maxBtn->setText("▢"); // 最大化时显示实心方框
+    }
+    setWindowTitle(tr("智能聊天 - 用户性别：%1").arg(userGender));
+}
+
 void MainWindow::setUserGender(const QString &gender) {
     userGender = gender;
     titleLabel->setText(tr("智能聊天 - 用户性别：%1").arg(gender));
+    setWindowTitle(titleLabel->text());
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event) {
+    QMainWindow::resizeEvent(event);
+
+    QScreen *screen = windowHandle()->screen();
+    if (screen) {
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+        m_scale = screen->devicePixelRatio();
+#else
+        qreal dpiX = screen->logicalDotsPerInchX();
+        m_scale = dpiX / 96.0;
+#endif
+
+        // 动态调整标题栏和按钮尺寸
+        titleBar->setFixedHeight(40 * m_scale);
+        loadIndicator->setFixedSize(18 * m_scale, 18 * m_scale);
+        minBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+        maxBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+        closeBtn->setFixedSize(22 * m_scale, 22 * m_scale);
+
+        // 更新标题栏布局
+        auto *titleLayout = qobject_cast<QHBoxLayout*>(titleBar->layout());
+        if (titleLayout) {
+            titleLayout->setContentsMargins(12 * m_scale, 0, 12 * m_scale, 0);
+            titleLayout->setSpacing(10 * m_scale);
+        }
+    }
 }
