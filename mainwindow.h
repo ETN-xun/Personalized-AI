@@ -24,6 +24,7 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
     void setUserGender(const QString &gender);
 
     // 属性读写函数
@@ -56,8 +57,8 @@ private:
 
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
-    QString apiKey = "sk-eea6568b51c74da88e91f32f91485ab9";
-    QString userGender = "未选择";
+    QString apiKey = "sk-eea6568b51c74da88e91f32f91485ab9"; // 确保使用正确的API密钥
+    QString userGender = "未选择"; // 确保声明
 
     // 窗口控制
     Direction mousePressRegion = NONE;
@@ -77,4 +78,7 @@ private:
     bool isLoading = false;
 
     double m_rotationAngle = 0.0;
+
+    // 新增函数声明
+    void sendChatRequest(const QString &question, bool isOptimization);
 };
