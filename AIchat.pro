@@ -14,9 +14,22 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp
 
+# 添加新文件到项目
 HEADERS += \
     genderselectdialog.h \
-    mainwindow.h
+    mainwindow.h \
+    hobbyselectdialog.h  # 新增
+
+SOURCES += \
+    genderselectdialog.cpp \
+    main.cpp \
+    mainwindow.cpp \
+    hobbyselectdialog.cpp  # 新增项放在这里
+
+HEADERS += \
+    genderselectdialog.h \
+    mainwindow.h \
+    hobbyselectdialog.h  # 新增
 
 FORMS += \
     mainwindow.ui
