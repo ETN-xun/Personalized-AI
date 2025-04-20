@@ -540,9 +540,10 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         layout->setContentsMargins(20, 20, 20, 20); // 增加边距
         layout->addWidget(new PieChartWidget);
         
-        QLabel *label = new QLabel("用户画像分布 (A:蓝色, B:绿色, C:红色)");
-        label->setAlignment(Qt::AlignCenter);
-        layout->addWidget(label);
+        // 移除添加标签的代码
+        // QLabel *label = new QLabel("用户画像分布 (A:蓝色, B:绿色, C:红色)");
+        // label->setAlignment(Qt::AlignCenter);
+        // layout->addWidget(label);
     
         // 修复3：确保窗口初始隐藏
         portraitWindow->hide();
@@ -621,5 +622,19 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(colors[i % colors.size()]);
         painter.drawPie(rect, i * sliceAngle, sliceAngle);
+
+        // 计算每个扇形的中心角度
+        int centerAngle = i * sliceAngle + sliceAngle / 2;
+        // 将角度转换为弧度
+        double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
+        // 计算文字的位置
+        QPointF textPos(
+            rect.center().x() + (rect.width() / 2 * 0.6) * cos(rad),
+            rect.center().y() + (rect.height() / 2 * 0.6) * sin(rad)
+        );
+
+        // 绘制文字
+        painter.setPen(Qt::black);
+        painter.drawText(textPos, m_hobbies[i]);
     }
 }
