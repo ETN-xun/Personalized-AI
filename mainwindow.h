@@ -71,6 +71,8 @@ private:
     QLabel *titleLabel;
     QPushButton *closeBtn;
     QPushButton *minBtn;
+    QPushButton *portraitBtn; // 新增画像按钮声明
+    QWidget *portraitWindow;  // 新增空白窗口声明
     QPushButton *maxBtn;
     QPropertyAnimation *rotationAnimation;
     QPropertyAnimation *m_sizeAnimation;

@@ -25,6 +25,8 @@ MainWindow::MainWindow(QWidget *parent)
     minBtn(nullptr),
     maxBtn(nullptr),
     closeBtn(nullptr),
+    portraitBtn(nullptr), // 初始化画像按钮指针
+    portraitWindow(nullptr), // 初始化画像窗口指针
     m_rotationAngle(0.0),
     isLoading(false),
     m_scale(1.0)
@@ -178,15 +180,17 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() {
     delete ui;
-    delete networkManager; // 补全网络管理器的释放
+    delete networkManager;
     delete rotationAnimation;
     delete m_sizeAnimation;
-    delete titleBar; // 确保所有子组件都被正确删除
+    delete titleBar;
     delete titleLabel;
     delete closeBtn;
     delete minBtn;
     delete maxBtn;
     delete loadIndicator;
+    delete portraitBtn; // 释放画像按钮
+    delete portraitWindow; // 释放画像窗口
 }
 
 // 新增：封装发送请求逻辑
@@ -506,5 +510,28 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     if (titleLayout) {
         titleLayout->setContentsMargins(12 * m_scale, 0, 12 * m_scale, 0);
         titleLayout->setSpacing(10 * m_scale);
+    }
+
+    // 确保画像按钮只创建一次
+    if (!portraitBtn) {
+        portraitBtn = new QPushButton("画像", this);
+        portraitBtn->setFixedSize(50, 50); // 设置按钮大小
+        // 将按钮添加到标题栏，假设标题栏布局已经存在
+        if (titleBar) {
+            QHBoxLayout *titleLayout = qobject_cast<QHBoxLayout*>(titleBar->layout());
+            if (titleLayout) {
+                int minBtnIndex = titleLayout->indexOf(minBtn);
+                titleLayout->insertWidget(minBtnIndex, portraitBtn);
+            }
+        }
+
+        // 初始化空白窗口
+        portraitWindow = new QWidget(nullptr);
+        portraitWindow->setWindowTitle("画像窗口");
+
+        // 连接按钮点击信号到槽函数
+        connect(portraitBtn, &QPushButton::clicked, this, [this]() {
+            portraitWindow->show();
+        });
     }
 }
