@@ -515,8 +515,8 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     // 确保画像按钮只创建一次
     if (!portraitBtn) {
         portraitBtn = new QPushButton("画像", this);
-        portraitBtn->setFixedSize(50, 50); // 设置按钮大小
-        // 将按钮添加到标题栏，假设标题栏布局已经存在
+        portraitBtn->setFixedSize(50, 50);
+        
         if (titleBar) {
             QHBoxLayout *titleLayout = qobject_cast<QHBoxLayout*>(titleBar->layout());
             if (titleLayout) {
@@ -524,14 +524,29 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
                 titleLayout->insertWidget(minBtnIndex, portraitBtn);
             }
         }
+        
+        // 修复1：设置主窗口为父对象
+        portraitWindow = new QWidget(this);  // 修改为this作为父对象
+        portraitWindow->setWindowFlag(Qt::Window); // 添加窗口标志
+        portraitWindow->setWindowTitle("用户画像分析");
+        portraitWindow->resize(400, 400);
+        
+        // 修复2：添加布局边距
+        QVBoxLayout *layout = new QVBoxLayout(portraitWindow);
+        layout->setContentsMargins(20, 20, 20, 20); // 增加边距
+        layout->addWidget(new PieChartWidget);
+        
+        QLabel *label = new QLabel("用户画像分布 (A:蓝色, B:绿色, C:红色)");
+        label->setAlignment(Qt::AlignCenter);
+        layout->addWidget(label);
+    
+        // 修复3：确保窗口初始隐藏
+        portraitWindow->hide();
+    } // <-- 添加缺失的闭合花括号
 
-        // 初始化空白窗口
-        portraitWindow = new QWidget(nullptr);
-        portraitWindow->setWindowTitle("画像窗口");
-
-        // 连接按钮点击信号到槽函数
-        connect(portraitBtn, &QPushButton::clicked, this, [this]() {
-            portraitWindow->show();
-        });
-    }
-}
+    // 修复4：连接信号（移到条件块外部）
+    connect(portraitBtn, &QPushButton::clicked, this, [this]() {
+        portraitWindow->setWindowModality(Qt::ApplicationModal);
+        portraitWindow->isHidden() ? portraitWindow->show() : portraitWindow->hide();
+    });
+} // <-- 确保这是resizeEvent函数的闭合花括号

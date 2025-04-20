@@ -12,6 +12,7 @@
 #include <QPushButton>
 #include <QWindow>
 #include <QtGui/qwindowdefs.h>
+#include <QPainter>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -83,4 +84,29 @@ private:
 
     // 新增函数声明
     void sendChatRequest(const QString &question, bool isOptimization);
+};
+
+
+class PieChartWidget : public QWidget {
+public:
+    explicit PieChartWidget(QWidget *parent = nullptr) : QWidget(parent) {}
+    
+protected:
+    void paintEvent(QPaintEvent *) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        
+        // 饼图参数
+        QRectF rect(10, 10, width()-20, height()-20);
+        QVector<QColor> colors{Qt::blue, Qt::green, Qt::red};
+        
+        // 绘制三个等分扇形
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(colors[0]);
+        painter.drawPie(rect, 0, 120*16);
+        painter.setBrush(colors[1]);
+        painter.drawPie(rect, 120*16, 120*16);
+        painter.setBrush(colors[2]);
+        painter.drawPie(rect, 240*16, 120*16);
+    }
 };
