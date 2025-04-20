@@ -605,37 +605,47 @@ void PieChartWidget::setHobbies(const QStringList &hobbies) {
 
 void PieChartWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::Antialiasing); // 添加抗锯齿优化
 
-    if (m_hobbies.isEmpty()) return;
+    if (m_hobbies.isEmpty()) return; // 处理空数据情况
 
     // 饼图参数
     QRectF rect(10, 10, width()-20, height()-20);
     QVector<QColor> colors{Qt::blue, Qt::green, Qt::red, Qt::yellow, 
                            Qt::magenta, Qt::cyan, Qt::gray, Qt::darkRed};
     
-    // 计算每个兴趣的占比角度（平均分配）
+    // 角度单位修正
+    const double totalDegrees = 360.0 * 16;
     const int count = m_hobbies.size();
-    const int sliceAngle = 360 * 16 / count; // 每个扇形角度
+    const int sliceAngle = static_cast<int>(totalDegrees / count); // 每个扇形角度
 
+    // 文本位置优化
+    const double textRadius = 0.8 * qMin(rect.width(), rect.height()) / 2;
+
+    // 先绘制饼图
     for (int i = 0; i < count; ++i) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(colors[i % colors.size()]);
         painter.drawPie(rect, i * sliceAngle, sliceAngle);
+    }
 
+    // 再绘制所有文字及其背景框
+    for (int i = 0; i < count; ++i) {
         // 计算每个扇形的中心角度
         int centerAngle = i * sliceAngle + sliceAngle / 2;
         // 将角度转换为弧度
         double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
         // 计算文字的位置
         QPointF textPos(
-            rect.center().x() + (rect.width() / 2 * 0.8) * cos(rad),
-            rect.center().y() + (rect.height() / 2 * 0.8) * sin(rad)
+            rect.center().x() + textRadius * cos(rad),
+            rect.center().y() + textRadius * sin(rad)
         );
 
-        // 获取文字的大小
+        // 文本边界框优化
         QFontMetrics fm(painter.font());
         QRect textRect = fm.boundingRect(m_hobbies[i]);
+        // 增加安全边距
+        textRect.adjust(-50, -40, 50, 40); 
         textRect.moveCenter(textPos.toPoint());
 
         // 绘制文字背景框
