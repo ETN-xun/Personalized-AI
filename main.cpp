@@ -21,8 +21,7 @@ int main(int argc ,char *argv[]) {
     // 创建主窗口并传递信息
     MainWindow w;
     w.setUserGender(genderDialog.getSelectedGender());
-    // 可以添加设置兴趣爱好的方法
-    // w.setUserHobbies(hobbyDialog.getSelectedHobbies());
+    w.setUserHobbies(hobbyDialog.getSelectedHobbies()); // 新增：设置用户兴趣爱好
     w.show();
 
     return a.exec();

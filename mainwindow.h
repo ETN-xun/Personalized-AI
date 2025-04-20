@@ -27,6 +27,7 @@ public:
     ~MainWindow();
 
     void setUserGender(const QString &gender);
+    void setUserHobbies(const QStringList &hobbies); // 新增：设置用户兴趣爱好
 
     // 属性读写函数
     double rotationAngle() const { return m_rotationAngle; }
@@ -78,6 +79,7 @@ private:
     QPropertyAnimation *rotationAnimation;
     QPropertyAnimation *m_sizeAnimation;
     QLabel *loadIndicator;
+    QStringList userHobbies; // 新增：存储用户选择的兴趣爱好
     bool isLoading = false;
 
     double m_rotationAngle = 0.0;
@@ -88,25 +90,12 @@ private:
 
 
 class PieChartWidget : public QWidget {
+    Q_OBJECT // 添加 Q_OBJECT 宏
 public:
     explicit PieChartWidget(QWidget *parent = nullptr) : QWidget(parent) {}
-    
+    void setHobbies(const QStringList &hobbies); // 新增：设置兴趣爱好列表
+private:
+    QStringList m_hobbies; // 新增：存储兴趣爱好列表
 protected:
-    void paintEvent(QPaintEvent *) override {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        
-        // 饼图参数
-        QRectF rect(10, 10, width()-20, height()-20);
-        QVector<QColor> colors{Qt::blue, Qt::green, Qt::red};
-        
-        // 绘制三个等分扇形
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(colors[0]);
-        painter.drawPie(rect, 0, 120*16);
-        painter.setBrush(colors[1]);
-        painter.drawPie(rect, 120*16, 120*16);
-        painter.setBrush(colors[2]);
-        painter.drawPie(rect, 240*16, 120*16);
-    }
+    void paintEvent(QPaintEvent *) override;
 };

@@ -550,3 +550,40 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         portraitWindow->isHidden() ? portraitWindow->show() : portraitWindow->hide();
     });
 } // <-- 确保这是resizeEvent函数的闭合花括号
+void MainWindow::setUserHobbies(const QStringList &hobbies) {
+    userHobbies = hobbies;
+
+    // 更新饼图数据
+    if (portraitWindow) {
+        QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
+        if (layout) {
+            PieChartWidget *pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget());
+            if (pieChart) {
+                pieChart->setHobbies(hobbies);
+            }
+        }
+    }
+}
+
+void PieChartWidget::setHobbies(const QStringList &hobbies) {
+    m_hobbies = hobbies;
+    update(); // 触发重绘
+}
+
+void PieChartWidget::paintEvent(QPaintEvent *) {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    if (m_hobbies.isEmpty()) return;
+
+    // 饼图参数
+    QRectF rect(10, 10, width()-20, height()-20);
+    QVector<QColor> colors{Qt::blue, Qt::green, Qt::red, Qt::yellow, Qt::magenta, Qt::cyan, Qt::gray, Qt::darkRed};
+    int sliceAngle = 360 * 16 / m_hobbies.size(); // 计算每个扇形的角度
+
+    for (int i = 0; i < m_hobbies.size(); ++i) {
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(colors[i % colors.size()]);
+        painter.drawPie(rect, i * sliceAngle, sliceAngle);
+    }
+}
