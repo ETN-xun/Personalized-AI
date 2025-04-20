@@ -21,33 +21,50 @@ HobbySelectDialog::HobbySelectDialog(QWidget *parent)
 
 void HobbySelectDialog::setupUI() {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(40, 40, 40, 40);
+    // 调整主布局边距，让页面四周有更多空白
+    mainLayout->setContentsMargins(60, 60, 60, 60);
+    mainLayout->setSpacing(30);
     
     // 标题栏（参考GenderSelectDialog样式）
     QHBoxLayout *titleLayout = new QHBoxLayout();
     QLabel *titleLabel = new QLabel("选择兴趣爱好", this);
-    titleLabel->setStyleSheet("color: black; font-size: 24px; font-weight: bold;");
+    // 优化标题样式，增加一些阴影效果
+    titleLabel->setStyleSheet(R"(
+        color: black; 
+        font-size: 28px; 
+        font-weight: bold;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    )");
     titleLayout->addWidget(titleLabel);
     mainLayout->addLayout(titleLayout);
 
     // 兴趣按钮布局
     gridLayout = new QGridLayout();
+    // 增加按钮之间的水平和垂直间距
+    gridLayout->setHorizontalSpacing(20);
+    gridLayout->setVerticalSpacing(20);
     QStringList hobbies = {"阅读", "运动", "音乐", "旅行", "美食", "游戏", "编程", "摄影"};
     
     for(int i=0; i<hobbies.size(); i++) {
         QPushButton *btn = new QPushButton(hobbies[i], this);
         btn->setCheckable(true);
+        // 优化按钮样式，增加过渡效果
         btn->setStyleSheet(R"(
             QPushButton {
                 background-color: #f0f0f0;
-                border-radius: 15px;
-                padding: 20px;
-                font-size: 18px;
+                border-radius: 20px;
+                padding: 25px;
+                font-size: 20px;
                 transition: all 0.3s ease;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
             QPushButton:checked {
                 background-color: #2196F3;
                 color: white;
+                box-shadow: 0 4px 8px rgba(33, 150, 243, 0.3);
+            }
+            QPushButton:hover {
+                transform: translateY(-2px);
             }
         )");
         connect(btn, &QPushButton::clicked, [this, btn](){ toggleHobby(btn); });
@@ -58,16 +75,24 @@ void HobbySelectDialog::setupUI() {
 
     // 确定按钮
     QPushButton *confirmBtn = new QPushButton("确定", this);
-    confirmBtn->setFixedSize(200, 60);
+    confirmBtn->setFixedSize(240, 70);
+    // 优化确定按钮样式，增加过渡效果
     confirmBtn->setStyleSheet(R"(
         QPushButton {
             background-color: #4CAF50;
             color: white;
-            font-size: 20px;
-            border-radius: 10px;
+            font-size: 24px;
+            border-radius: 35px;
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+            transition: all 0.3s ease;
         }
         QPushButton:hover {
             background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        QPushButton:pressed {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
         }
     )");
     // 修改确定按钮的点击事件
