@@ -611,16 +611,25 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
 
     // 饼图参数
     QRectF rect(10, 10, width()-20, height()-20);
-    QVector<QColor> colors{Qt::blue, Qt::green, Qt::red, Qt::yellow, 
-                           Qt::magenta, Qt::cyan, Qt::gray, Qt::darkRed};
+    // 调整饼状图颜色为更柔和的色调
+    QVector<QColor> colors{
+        QColor("#66BB6A"), QColor("#42A5F5"), QColor("#FFA726"), 
+        QColor("#EC407A"), QColor("#7E57C2"), QColor("#26A69A"), 
+        QColor("#9575CD"), QColor("#FFB74D")
+    };
     
     // 角度单位修正
     const double totalDegrees = 360.0 * 16;
     const int count = m_hobbies.size();
     const int sliceAngle = static_cast<int>(totalDegrees / count); // 每个扇形角度
 
-    // 文本位置优化
-    const double textRadius = 0.8 * qMin(rect.width(), rect.height()) / 2;
+    // 文本位置优化，减小 textRadius 让文字离中心更近
+    const double textRadius = 0.6 * qMin(rect.width(), rect.height()) / 2;
+
+    // 增大文字字号
+    QFont font = painter.font();
+    font.setPointSize(12); // 可根据需要调整字号
+    painter.setFont(font);
 
     // 先绘制饼图
     for (int i = 0; i < count; ++i) {
@@ -641,17 +650,17 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
             rect.center().y() + textRadius * sin(rad)
         );
 
-        // 文本边界框优化
+        // 文本边界框优化，减小安全边距
         QFontMetrics fm(painter.font());
         QRect textRect = fm.boundingRect(m_hobbies[i]);
-        // 增加安全边距
-        textRect.adjust(-50, -40, 50, 40); 
+        // 减小安全边距
+        textRect.adjust(-10, -5, 10, 5); 
         textRect.moveCenter(textPos.toPoint());
 
-        // 绘制文字背景框
-        painter.setBrush(Qt::white);
-        painter.setPen(Qt::gray);
-        painter.drawRect(textRect.adjusted(-2, -2, 2, 2));
+        // 绘制没有边框的圆角矩形文本框
+        painter.setPen(Qt::NoPen); // 无边框
+        painter.setBrush(QColor(255, 255, 255, 200)); // 设置半透明白色背景
+        painter.drawRoundedRect(textRect, 5, 5); // 绘制圆角矩形，圆角半径为 5
 
         // 绘制文字
         painter.setPen(Qt::black);
