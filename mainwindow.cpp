@@ -629,12 +629,22 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
         double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
         // 计算文字的位置
         QPointF textPos(
-            rect.center().x() + (rect.width() / 2 * 0.6) * cos(rad),
-            rect.center().y() + (rect.height() / 2 * 0.6) * sin(rad)
+            rect.center().x() + (rect.width() / 2 * 0.8) * cos(rad),
+            rect.center().y() + (rect.height() / 2 * 0.8) * sin(rad)
         );
+
+        // 获取文字的大小
+        QFontMetrics fm(painter.font());
+        QRect textRect = fm.boundingRect(m_hobbies[i]);
+        textRect.moveCenter(textPos.toPoint());
+
+        // 绘制文字背景框
+        painter.setBrush(Qt::white);
+        painter.setPen(Qt::gray);
+        painter.drawRect(textRect.adjusted(-2, -2, 2, 2));
 
         // 绘制文字
         painter.setPen(Qt::black);
-        painter.drawText(textPos, m_hobbies[i]);
+        painter.drawText(textRect, Qt::AlignCenter, m_hobbies[i]);
     }
 }
