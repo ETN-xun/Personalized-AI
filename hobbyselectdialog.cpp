@@ -4,6 +4,13 @@
 #include <QLabel> // 添加QLabel头文件
 #include <QVBoxLayout> // 添加布局头文件
 
+// 添加缺失的头文件引用
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonArray>
+
 HobbySelectDialog::HobbySelectDialog(QWidget *parent)
     : QDialog(parent), m_scaleAnimation(new QPropertyAnimation(this, "geometry"))
 {
@@ -63,8 +70,36 @@ void HobbySelectDialog::setupUI() {
             background-color: #45a049;
         }
     )");
-    connect(confirmBtn, &QPushButton::clicked, this, &QDialog::accept);
-    mainLayout->addWidget(confirmBtn, 0, Qt::AlignCenter);
+    // 修改确定按钮的点击事件
+    connect(confirmBtn, &QPushButton::clicked, this, [this]() {
+        // 保存到JSON文件（已修复类型识别问题）
+        QJsonArray hobbiesArray;
+        foreach (const QString &hobby, selectedHobbies) {
+            hobbiesArray.append(hobby);
+        }
+        
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QDir().mkpath(path);
+        QFile file(path + "/hobbies.json");
+        if (file.open(QIODevice::WriteOnly)) {
+            QJsonDocument doc(hobbiesArray);
+            file.write(doc.toJson());
+            file.close();
+        }
+        
+        accept();
+    });
+
+    // 在兴趣按钮布局后添加伸展空间和确定按钮
+    mainLayout->addStretch(); // 添加伸展空间使按钮位于底部
+    
+    // 确定按钮容器
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->addStretch();
+    buttonLayout->addWidget(confirmBtn);
+    buttonLayout->addStretch();
+    
+    mainLayout->addLayout(buttonLayout); // 将按钮布局添加到主布局底部
 }
 
 void HobbySelectDialog::toggleHobby(QPushButton *button) {

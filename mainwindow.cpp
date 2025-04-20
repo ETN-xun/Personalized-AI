@@ -10,6 +10,9 @@
 #include <QWindow>
 #include <QHBoxLayout>
 #include <QApplication>
+// 在文件顶部添加头文件引用
+#include <QStandardPaths>
+#include <QFile>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -490,6 +493,7 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     setCursor(Qt::ArrowCursor);
 }
 
+// 在resizeEvent函数中添加读取逻辑
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event);
 
@@ -545,9 +549,37 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     } // <-- 添加缺失的闭合花括号
 
     // 修复4：连接信号（移到条件块外部）
+    // 修改画像按钮点击事件处理
     connect(portraitBtn, &QPushButton::clicked, this, [this]() {
-        portraitWindow->setWindowModality(Qt::ApplicationModal);
-        portraitWindow->isHidden() ? portraitWindow->show() : portraitWindow->hide();
+    // 读取JSON文件
+    QStringList hobbies;
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(path + "/hobbies.json");
+    
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            foreach (const QJsonValue &value, array) {
+                hobbies.append(value.toString());
+            }
+        }
+        file.close();
+    }
+    
+    // 更新饼图数据
+    if (portraitWindow) {
+        QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
+        if (layout) {
+            if (PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget())) {
+                pieChart->setHobbies(hobbies);
+                pieChart->update(); // 强制重绘
+            }
+        }
+    }
+    
+    portraitWindow->setWindowModality(Qt::ApplicationModal);
+    portraitWindow->isHidden() ? portraitWindow->show() : portraitWindow->hide();
     });
 } // <-- 确保这是resizeEvent函数的闭合花括号
 void MainWindow::setUserHobbies(const QStringList &hobbies) {
@@ -578,10 +610,14 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
 
     // 饼图参数
     QRectF rect(10, 10, width()-20, height()-20);
-    QVector<QColor> colors{Qt::blue, Qt::green, Qt::red, Qt::yellow, Qt::magenta, Qt::cyan, Qt::gray, Qt::darkRed};
-    int sliceAngle = 360 * 16 / m_hobbies.size(); // 计算每个扇形的角度
+    QVector<QColor> colors{Qt::blue, Qt::green, Qt::red, Qt::yellow, 
+                           Qt::magenta, Qt::cyan, Qt::gray, Qt::darkRed};
+    
+    // 计算每个兴趣的占比角度（平均分配）
+    const int count = m_hobbies.size();
+    const int sliceAngle = 360 * 16 / count; // 每个扇形角度
 
-    for (int i = 0; i < m_hobbies.size(); ++i) {
+    for (int i = 0; i < count; ++i) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(colors[i % colors.size()]);
         painter.drawPie(rect, i * sliceAngle, sliceAngle);
