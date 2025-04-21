@@ -90,12 +90,14 @@ private:
 
 
 class PieChartWidget : public QWidget {
-    Q_OBJECT // 添加 Q_OBJECT 宏
+    Q_OBJECT
 public:
     explicit PieChartWidget(QWidget *parent = nullptr) : QWidget(parent) {}
-    void setHobbies(const QStringList &hobbies); // 新增：设置兴趣爱好列表
+    void setHobbiesWithWeights(const QList<QPair<QString, int>> &hobbies);
+    void setHobbies(const QStringList &hobbies) { m_hobbies = hobbies; update(); }
 private:
-    QStringList m_hobbies; // 新增：存储兴趣爱好列表
+    QList<QPair<QString, int>> m_hobbiesWithWeights;
+    QStringList m_hobbies;  // 添加成员变量
 protected:
     void paintEvent(QPaintEvent *) override;
 };

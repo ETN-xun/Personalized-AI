@@ -159,9 +159,11 @@ MainWindow::MainWindow(QWidget *parent)
         const int indicatorSize = 18 * static_cast<int>(m_scale);
         const int lineWidth = 2;
 
+        // 修改第 162 行
         painter.setPen(QPen(QColor("#4A90E2"), lineWidth));
         painter.drawEllipse(0, 0, indicatorSize, indicatorSize);
 
+        // 修改第 165 行
         painter.setPen(QPen(QColor("#FFD700"), lineWidth));
         painter.drawArc(0, 0, indicatorSize, indicatorSize,
                         static_cast<int>(rotationAngle() * 16),
@@ -587,28 +589,47 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
 void MainWindow::setUserHobbies(const QStringList &hobbies) {
     userHobbies = hobbies;
 
-    // 提取兴趣名称列表
-    QStringList hobbyNames;
-    foreach (const QString &hobby, hobbies) {
-        hobbyNames.append(hobby); // 这里保持原逻辑，实际可以解析权重
-    }
+    // 读取hobbies.json文件
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(path + "/hobbies.json");
+    QList<QPair<QString, int>> hobbyWeights;
     
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &value : array) {
+                QJsonObject obj = value.toObject();
+                hobbyWeights.append(qMakePair(
+                    obj["name"].toString(),
+                    obj["weight"].toInt()
+                ));
+            }
+        }
+        file.close();
+    }
+
     // 更新饼图数据...
     if (portraitWindow) {
         QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
         if (layout) {
             PieChartWidget *pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget());
             if (pieChart) {
-                pieChart->setHobbies(hobbies);
+                QList<QPair<QString, int>> hobbiesWithWeights;
+                foreach (const QString &hobby, hobbies) {
+                    // Find matching hobby in the loaded weights
+                    auto it = std::find_if(hobbyWeights.begin(), hobbyWeights.end(),
+                        [&hobby](const QPair<QString, int>& item) { return item.first == hobby; });
+                    int weight = (it != hobbyWeights.end()) ? it->second : 1;
+                    hobbiesWithWeights.append(qMakePair(hobby, weight));
+                }
+                pieChart->setHobbiesWithWeights(hobbiesWithWeights);
             }
         }
     }
 }
 
-void PieChartWidget::setHobbies(const QStringList &hobbies) {
-    m_hobbies = hobbies;
-    update(); // 触发重绘
-}
+
 
 void PieChartWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
@@ -673,4 +694,9 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
         painter.setPen(Qt::black);
         painter.drawText(textRect, Qt::AlignCenter, m_hobbies[i]);
     }
+}
+
+void PieChartWidget::setHobbiesWithWeights(const QList<QPair<QString, int>> &hobbies) {
+    m_hobbiesWithWeights = hobbies;
+    update(); // 触发重绘
 }
