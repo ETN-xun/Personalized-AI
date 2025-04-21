@@ -260,7 +260,7 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                     QString optimizedQuestion = message["content"].toString();
                     // 发送优化后的问题
                     sendChatRequest(optimizedQuestion, false);
-                    ui->textEditChat->append(tr("优化后的问题: %1").arg(optimizedQuestion));
+                    //ui->textEditChat->append(tr("优化后的问题: %1").arg(optimizedQuestion));
                 } else {
                     // 优化失败则直接发送原问题
                     sendChatRequest(originalInput, false);
