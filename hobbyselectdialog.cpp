@@ -10,6 +10,9 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
+// 添加以下两个头文件
+#include <QJsonObject>
+#include <QJsonDocument>
 
 HobbySelectDialog::HobbySelectDialog(QWidget *parent)
     : QDialog(parent), m_scaleAnimation(new QPropertyAnimation(this, "geometry"))
@@ -100,7 +103,10 @@ void HobbySelectDialog::setupUI() {
         // 保存到JSON文件（已修复类型识别问题）
         QJsonArray hobbiesArray;
         foreach (const QString &hobby, selectedHobbies) {
-            hobbiesArray.append(hobby);
+            QJsonObject obj;
+            obj["name"] = hobby;  // 保持QString类型赋值
+            obj["weight"] = 1;  // 添加默认权重
+            hobbiesArray.append(obj);
         }
         
         QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);

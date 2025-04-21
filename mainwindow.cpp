@@ -552,9 +552,9 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     // 修复4：连接信号（移到条件块外部）
     // 修改画像按钮点击事件处理
     connect(portraitBtn, &QPushButton::clicked, this, [this]() {
-    // 读取JSON文件
-    QStringList hobbies;
+    // 添加路径声明
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QStringList hobbies;
     QFile file(path + "/hobbies.json");
     
     if (file.open(QIODevice::ReadOnly)) {
@@ -562,7 +562,8 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         if (doc.isArray()) {
             QJsonArray array = doc.array();
             foreach (const QJsonValue &value, array) {
-                hobbies.append(value.toString());
+                QJsonObject obj = value.toObject();
+                hobbies.append(obj["name"].toString());
             }
         }
         file.close();
@@ -586,7 +587,13 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
 void MainWindow::setUserHobbies(const QStringList &hobbies) {
     userHobbies = hobbies;
 
-    // 更新饼图数据
+    // 提取兴趣名称列表
+    QStringList hobbyNames;
+    foreach (const QString &hobby, hobbies) {
+        hobbyNames.append(hobby); // 这里保持原逻辑，实际可以解析权重
+    }
+    
+    // 更新饼图数据...
     if (portraitWindow) {
         QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
         if (layout) {
