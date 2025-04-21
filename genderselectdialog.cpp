@@ -3,6 +3,11 @@
 #include <QScreen>
 #include <QHBoxLayout>
 #include <QDebug>
+#include <QFile>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QStandardPaths> // 添加头文件
+#include <QDir>
 
 GenderSelectDialog::GenderSelectDialog(QWidget *parent)
     : QDialog(parent), m_scaleAnimation(new QPropertyAnimation(this, "geometry")),
@@ -155,15 +160,38 @@ void GenderSelectDialog::showEvent(QShowEvent *event)
     }
 
     // 连接按钮信号（确保样式已设置）
-    connect(maleBtn, &QPushButton::clicked, this, [this]() {
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation); // 声明并赋值 path
+    QDir dir(path);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    connect(maleBtn, &QPushButton::clicked, this, [this, path]() { // 捕获 path
         selectedGender = "男";
         emit genderSelected(selectedGender);
+        // 保存选择结果到JSON文件
+        QFile file(path + "/gender_info.json"); 
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QJsonObject jsonObj;
+            jsonObj["gender"] = selectedGender;
+            QJsonDocument doc(jsonObj);
+            file.write(doc.toJson());
+            file.close();
+        }
         accept();
     });
 
-    connect(femaleBtn, &QPushButton::clicked, this, [this]() {
+    connect(femaleBtn, &QPushButton::clicked, this, [this, path]() { // 捕获 path
         selectedGender = "女";
         emit genderSelected(selectedGender);
+        // 保存选择结果到JSON文件
+        QFile file(path + "/gender_info.json"); 
+        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QJsonObject jsonObj;
+            jsonObj["gender"] = selectedGender;
+            QJsonDocument doc(jsonObj);
+            file.write(doc.toJson());
+            file.close();
+        }
         accept();
     });
 
