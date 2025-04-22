@@ -25,8 +25,8 @@ HobbySelectDialog::HobbySelectDialog(QWidget *parent)
 void HobbySelectDialog::setupUI() {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     // 调整主布局边距，让页面四周有更多空白
-    mainLayout->setContentsMargins(60, 60, 60, 60);
-    mainLayout->setSpacing(30);
+    mainLayout->setContentsMargins(70, 70, 70, 70);
+    mainLayout->setSpacing(40);
     
     // 标题栏（参考GenderSelectDialog样式）
     QHBoxLayout *titleLayout = new QHBoxLayout();
@@ -43,21 +43,30 @@ void HobbySelectDialog::setupUI() {
 
     // 兴趣按钮布局
     gridLayout = new QGridLayout();
-    // 增加按钮之间的水平和垂直间距
+    // 调整按钮之间的水平和垂直间距
     gridLayout->setHorizontalSpacing(20);
     gridLayout->setVerticalSpacing(20);
-    QStringList hobbies = {"阅读", "运动", "音乐", "旅行", "美食", "游戏", "编程", "摄影"};
+    QStringList hobbies = {
+        "阅读", "运动", "音乐", "旅行", 
+        "美食", "游戏", "编程", "摄影", 
+        "绘画", "舞蹈", "电影", "写作", 
+        "园艺", "手工", "收藏", "冥想"
+    };
     
+    // 恢复每行4个按钮的排版
     for(int i=0; i<hobbies.size(); i++) {
         QPushButton *btn = new QPushButton(hobbies[i], this);
         btn->setCheckable(true);
-        // 优化按钮样式，增加过渡效果
+        // 优化按钮样式，调小按钮尺寸但保持字号不变
         btn->setStyleSheet(R"(
             QPushButton {
                 background-color: #f0f0f0;
-                border-radius: 20px;
-                padding: 25px;
+                border-radius: 15px;
+                padding: 10px 15px;
                 font-size: 20px;
+                min-height: 50px;
+                min-width: 100px;
+                line-height: 30px;
                 transition: all 0.3s ease;
                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
@@ -121,8 +130,8 @@ void HobbySelectDialog::setupUI() {
         accept();
     });
 
-    // 在兴趣按钮布局后添加伸展空间和确定按钮
-    mainLayout->addStretch(); // 添加伸展空间使按钮位于底部
+    // 在兴趣按钮布局后添加更多伸展空间，将确定按钮往下移
+    mainLayout->addStretch(2); // 增加伸展系数，使按钮位于更下方
     
     // 确定按钮容器
     QHBoxLayout *buttonLayout = new QHBoxLayout();
@@ -131,6 +140,7 @@ void HobbySelectDialog::setupUI() {
     buttonLayout->addStretch();
     
     mainLayout->addLayout(buttonLayout); // 将按钮布局添加到主布局底部
+    mainLayout->addSpacing(30); // 在确定按钮下方添加额外空间
 }
 
 void HobbySelectDialog::toggleHobby(QPushButton *button) {
@@ -151,11 +161,12 @@ void HobbySelectDialog::showEvent(QShowEvent *event) {
     QScreen *screen = QGuiApplication::primaryScreen();
     QRect screenRect = screen->availableGeometry();
     
-    QSize size(800, 600);
+    // 增加窗口尺寸，从800x600改为900x700
+    QSize size(900, 700);
     setFixedSize(size);
     
     m_scaleAnimation->setStartValue(QRect(screenRect.center().x(), screenRect.bottom(), 0, 0));
-    m_scaleAnimation->setEndValue(QRect(screenRect.center().x()-400, screenRect.center().y()-300, 800, 600));
+    m_scaleAnimation->setEndValue(QRect(screenRect.center().x()-450, screenRect.center().y()-350, 900, 700));
     m_scaleAnimation->setDuration(800);
     m_scaleAnimation->setEasingCurve(QEasingCurve::OutQuint);
     m_scaleAnimation->start();
