@@ -643,6 +643,7 @@ void MainWindow::createQuestionButtons() {
     
     // 生成三个问题
     QStringList newQuestions;
+    QStringList selectedHobbies; // 临时数组存储选择的兴趣
     
     // 定义一些角度和修饰词，增加问题的多样性
     QStringList angles = {
@@ -681,6 +682,7 @@ void MainWindow::createQuestionButtons() {
         
         // 使用AI生成与所选兴趣相关的问题
         if (!selectedHobby.isEmpty()) {
+            selectedHobbies.append(selectedHobby); // 将选择的兴趣添加到临时数组
             // 随机选择一个角度
             QString angle = angles.at(QRandomGenerator::global()->bounded(angles.size()));
             
@@ -811,7 +813,31 @@ void MainWindow::createQuestionButtons() {
         );
         
         // 连接信号槽
-        connect(btn, &QPushButton::clicked, this, &MainWindow::onQuestionButtonClicked);
+        connect(btn, &QPushButton::clicked, this, [this, i, selectedHobbies]() {
+            onQuestionButtonClicked();
+            // 更新hobbies.json中对应兴趣的权重
+            QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            QFile file(path + "/hobbies.json");
+            if (file.open(QIODevice::ReadOnly)) {
+                QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+                if (doc.isArray()) {
+                    QJsonArray array = doc.array();
+                    for (int j = 0; j < array.size(); ++j) {
+                        QJsonObject obj = array[j].toObject();
+                        if (obj["name"].toString() == selectedHobbies[i]) {
+                            obj["weight"] = obj["weight"].toInt() + 1;
+                            array[j] = obj;
+                            break;
+                        }
+                    }
+                    file.close();
+                    if (file.open(QIODevice::WriteOnly)) {
+                        file.write(QJsonDocument(array).toJson());
+                        file.close();
+                    }
+                }
+            }
+        });
         
         if(!hasAskedQuestion)
         {
