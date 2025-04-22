@@ -15,7 +15,7 @@
 #include <QFile>
 #include <QRandomGenerator>
 #include <QEventLoop>
-
+#include "customizepage.h"
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -36,7 +36,8 @@ MainWindow::MainWindow(QWidget *parent)
     isLoading(false),
     m_scale(1.0),
     buttonsShown(false),
-    hasAskedQuestion(false)
+    hasAskedQuestion(false),
+    customizeBtn(nullptr) // 添加量身定制按钮指针
 {
     // 调整初始化顺序以匹配.h中的成员变量声明顺序
     ui->setupUi(this);
@@ -146,6 +147,39 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:hover { background: #63B8FF; }
         QPushButton:pressed { background: #3A7BFF; }
     )");
+    
+    // 添加"量身定制"按钮
+    customizeBtn = new QPushButton("量身定制", this);
+    customizeBtn->setFixedSize(75, 30); // 比发送按钮小一半
+    customizeBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #4A90E2;
+            color: white;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        QPushButton:hover { background: #63B8FF; }
+        QPushButton:pressed { background: #3A7BFF; }
+    )");
+
+    // 将按钮添加到布局中
+    QVBoxLayout *sendBtnLayout = new QVBoxLayout();
+    sendBtnLayout->setSpacing(5);
+    sendBtnLayout->addWidget(customizeBtn, 0, Qt::AlignCenter);
+    sendBtnLayout->addWidget(ui->pushButtonSend);
+
+    // 替换原来的发送按钮
+    QHBoxLayout *inputLayout = qobject_cast<QHBoxLayout*>(ui->horizontalLayout);
+    if (inputLayout) {
+        // 移除原来的发送按钮
+        inputLayout->removeWidget(ui->pushButtonSend);
+        // 添加新的布局（包含量身定制按钮和发送按钮）
+        inputLayout->addLayout(sendBtnLayout);
+    }
+
+    // 连接量身定制按钮的点击信号
+    connect(customizeBtn, &QPushButton::clicked, this, &MainWindow::openCustomizePage);
+    
     connect(ui->lineEditInput, &QLineEdit::returnPressed, this, [this]() {
         // 设置标志，表示用户已经提过问题
         hasAskedQuestion = true;
@@ -1102,7 +1136,11 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
         startAngle += angle;
     }
 }
-
+void MainWindow::openCustomizePage()
+{
+    CustomizePage *page = new CustomizePage();
+    page->show();
+}
 void PieChartWidget::setHobbiesWithWeights(const QList<QPair<QString, int>> &hobbies) {
     m_hobbiesWithWeights = hobbies;
     update(); // 触发重绘

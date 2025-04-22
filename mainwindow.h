@@ -52,8 +52,10 @@ private slots:
     void onReplyFinished(QNetworkReply *reply);
     void toggleMaximize();
     void onQuestionButtonClicked(); // 新增：问题按钮点击处理
+    void openCustomizePage();
 
 private:
+    QPushButton *customizeBtn;
     enum Direction { UP, DOWN, LEFT, RIGHT, LEFT_TOP, LEFT_BOTTOM, RIGHT_TOP, RIGHT_BOTTOM, NONE };
     int getMouseRegion(const QPoint &pos) const;
     void updateCursorShape(const QPoint &pos);

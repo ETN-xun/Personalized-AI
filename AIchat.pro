@@ -11,26 +11,17 @@ CONFIG += c++17
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
 
 SOURCES += \
+    customizepage.cpp \
     genderselectdialog.cpp \
+    hobbyselectdialog.cpp \
     main.cpp \
     mainwindow.cpp
 
-# 添加新文件到项目
 HEADERS += \
+    customizepage.h \
     genderselectdialog.h \
-    mainwindow.h \
-    hobbyselectdialog.h  # 新增
-
-SOURCES += \
-    genderselectdialog.cpp \
-    main.cpp \
-    mainwindow.cpp \
-    hobbyselectdialog.cpp  # 新增项放在这里
-
-HEADERS += \
-    genderselectdialog.h \
-    mainwindow.h \
-    hobbyselectdialog.h  # 新增
+    hobbyselectdialog.h \
+    mainwindow.h
 
 FORMS += \
     mainwindow.ui
