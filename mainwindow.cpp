@@ -226,6 +226,10 @@ MainWindow::~MainWindow() {
 
 // 新增：封装发送请求逻辑
 void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
+    // 设置加载状态
+    isLoading = true;
+    rotationAnimation->start();
+
     // 设置标志，防止再次显示问题按钮
     buttonsShown = true;
     hasAskedQuestion = true;  // 确保记录用户已提问
@@ -236,11 +240,6 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
             btn->hide();
         }
     }
-    
-    // 确保停止加载动画
-    isLoading = false;
-    rotationAnimation->stop();
-    loadIndicator->clear();
     
     QJsonObject json{
                      {"model", "deepseek-chat"},
@@ -270,6 +269,13 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
     request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8().data()); // 使用data()获取char*
 
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        // 停止加载动画
+        isLoading = false;
+        rotationAnimation->stop();
+        loadIndicator->clear();
+        // ... existing code ...
+    });
     reply->setProperty("requestType", isOptimization ? "optimization" : "chat");
     reply->setProperty("originalInput", question);
 }
@@ -301,6 +307,10 @@ void MainWindow::on_pushButtonSend_clicked() {
 
     // 发送聊天请求
     sendChatRequest(input, false);
+    // 停止加载动画
+    isLoading = false;
+    rotationAnimation->stop();
+    loadIndicator->clear();
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
@@ -400,26 +410,17 @@ void MainWindow::showEvent(QShowEvent *event) {
     // 显示加载指示器
     isLoading = true;
     rotationAnimation->start();
-    
-    // 修改定时器逻辑，如果用户已经提问过，直接停止加载动画而不创建定时器
-    if (hasAskedQuestion || buttonsShown) {
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-    } else {
-        // 使用QTimer延迟创建问题按钮，让窗口先显示出来
-        QTimer::singleShot(100, this, [this]() {
-            // 确保在延迟执行时再次检查hasAskedQuestion标志
-            if (!hasAskedQuestion && !buttonsShown) {
-                createQuestionButtons();
-            } else {
-                // 如果用户已经提问，停止加载动画
-                isLoading = false;
-                rotationAnimation->stop();
-                loadIndicator->clear();
-            }
-        });
-    }
+
+    // 使用QTimer延迟创建问题按钮，让窗口先显示出来
+    QTimer::singleShot(100, this, [this]() {
+        if (!hasAskedQuestion && !buttonsShown) {
+            createQuestionButtons();
+            // 停止加载动画
+            isLoading = false;
+            rotationAnimation->stop();
+            loadIndicator->clear();
+        }
+    });
 }
 
 void MainWindow::toggleMaximize() {
