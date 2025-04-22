@@ -552,11 +552,10 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     } // <-- 添加缺失的闭合花括号
 
     // 修复4：连接信号（移到条件块外部）
-    // 修改画像按钮点击事件处理
     connect(portraitBtn, &QPushButton::clicked, this, [this]() {
     // 添加路径声明
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QStringList hobbies;
+    QList<QPair<QString, int>> hobbiesWithWeights;
     QFile file(path + "/hobbies.json");
     
     if (file.open(QIODevice::ReadOnly)) {
@@ -565,7 +564,9 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
             QJsonArray array = doc.array();
             foreach (const QJsonValue &value, array) {
                 QJsonObject obj = value.toObject();
-                hobbies.append(obj["name"].toString());
+                QString name = obj["name"].toString();
+                int weight = obj["weight"].toInt();
+                hobbiesWithWeights.append(qMakePair(name, weight));
             }
         }
         file.close();
@@ -576,7 +577,7 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
         if (layout) {
             if (PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget())) {
-                pieChart->setHobbies(hobbies);
+                pieChart->setHobbiesWithWeights(hobbiesWithWeights);
                 pieChart->update(); // 强制重绘
             }
         }
@@ -635,64 +636,88 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing); // 添加抗锯齿优化
 
-    if (m_hobbies.isEmpty()) return; // 处理空数据情况
-
-    // 饼图参数
-    QRectF rect(10, 10, width()-20, height()-20);
-    // 调整饼状图颜色为更柔和的色调
-    QVector<QColor> colors{
-        QColor("#66BB6A"), QColor("#42A5F5"), QColor("#FFA726"), 
-        QColor("#EC407A"), QColor("#7E57C2"), QColor("#26A69A"), 
-        QColor("#9575CD"), QColor("#FFB74D")
-    };
-    
-    // 角度单位修正
-    const double totalDegrees = 360.0 * 16;
-    const int count = m_hobbies.size();
-    const int sliceAngle = static_cast<int>(totalDegrees / count); // 每个扇形角度
-
-    // 文本位置优化，减小 textRadius 让文字离中心更近
-    const double textRadius = 0.6 * qMin(rect.width(), rect.height()) / 2;
-
-    // 增大文字字号
-    QFont font = painter.font();
-    font.setPointSize(12); // 可根据需要调整字号
-    painter.setFont(font);
-
-    // 先绘制饼图
-    for (int i = 0; i < count; ++i) {
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(colors[i % colors.size()]);
-        painter.drawPie(rect, i * sliceAngle, sliceAngle);
-    }
-
-    // 再绘制所有文字及其背景框
-    for (int i = 0; i < count; ++i) {
-        // 计算每个扇形的中心角度
-        int centerAngle = i * sliceAngle + sliceAngle / 2;
-        // 将角度转换为弧度
-        double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
-        // 计算文字的位置
-        QPointF textPos(
-            rect.center().x() + textRadius * cos(rad),
-            rect.center().y() + textRadius * sin(rad)
-        );
-
-        // 文本边界框优化，减小安全边距
-        QFontMetrics fm(painter.font());
-        QRect textRect = fm.boundingRect(m_hobbies[i]);
-        // 减小安全边距
-        textRect.adjust(-10, -5, 10, 5); 
-        textRect.moveCenter(textPos.toPoint());
-
-        // 绘制没有边框的圆角矩形文本框
-        painter.setPen(Qt::NoPen); // 无边框
-        painter.setBrush(QColor(255, 255, 255, 200)); // 设置半透明白色背景
-        painter.drawRoundedRect(textRect, 5, 5); // 绘制圆角矩形，圆角半径为 5
-
-        // 绘制文字
-        painter.setPen(Qt::black);
-        painter.drawText(textRect, Qt::AlignCenter, m_hobbies[i]);
+    // 检查是否有带权重的兴趣爱好数据
+    if (!m_hobbiesWithWeights.isEmpty()) {
+        // 使用带权重的数据绘制饼图
+        QRectF rect(10, 10, width()-20, height()-20);
+        // 调整饼状图颜色为更柔和的色调
+        QVector<QColor> colors{
+            QColor("#66BB6A"), QColor("#42A5F5"), QColor("#FFA726"), 
+            QColor("#EC407A"), QColor("#7E57C2"), QColor("#26A69A"), 
+            QColor("#9575CD"), QColor("#FFB74D")
+        };
+        
+        // 计算总权重
+        int totalWeight = 0;
+        for (const auto &hobby : m_hobbiesWithWeights) {
+            totalWeight += hobby.second;
+        }
+        
+        // 角度单位为1/16度
+        const double totalDegrees = 360.0 * 16;
+        int startAngle = 0;
+        
+        // 先绘制饼图
+        for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(colors[i % colors.size()]);
+            
+            // 根据权重计算扇形角度
+            int sliceAngle = static_cast<int>((m_hobbiesWithWeights[i].second * totalDegrees) / totalWeight);
+            painter.drawPie(rect, startAngle, sliceAngle);
+            
+            // 更新起始角度
+            startAngle += sliceAngle;
+        }
+        
+        // 文本位置优化，减小 textRadius 让文字离中心更近
+        const double textRadius = 0.6 * qMin(rect.width(), rect.height()) / 2;
+        
+        // 增大文字字号
+        QFont font = painter.font();
+        font.setPointSize(12); // 可根据需要调整字号
+        painter.setFont(font);
+        
+        // 再绘制所有文字及其背景框
+        startAngle = 0;
+        for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
+            // 计算每个扇形的角度
+            int sliceAngle = static_cast<int>((m_hobbiesWithWeights[i].second * totalDegrees) / totalWeight);
+            
+            // 计算每个扇形的中心角度
+            int centerAngle = startAngle + sliceAngle / 2;
+            
+            // 将角度转换为弧度
+            double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
+            
+            // 计算文字的位置
+            QPointF textPos(
+                rect.center().x() + textRadius * cos(rad),
+                rect.center().y() + textRadius * sin(rad)
+            );
+            
+            // 文本边界框优化，减小安全边距
+            QFontMetrics fm(painter.font());
+            QRect textRect = fm.boundingRect(m_hobbiesWithWeights[i].first);
+            // 减小安全边距
+            textRect.adjust(-10, -5, 10, 5); 
+            textRect.moveCenter(textPos.toPoint());
+            
+            // 绘制没有边框的圆角矩形文本框
+            painter.setPen(Qt::NoPen); // 无边框
+            painter.setBrush(QColor(255, 255, 255, 200)); // 设置半透明白色背景
+            painter.drawRoundedRect(textRect, 5, 5); // 绘制圆角矩形，圆角半径为 5
+            
+            // 绘制文字
+            painter.setPen(Qt::black);
+            painter.drawText(textRect, Qt::AlignCenter, m_hobbiesWithWeights[i].first);
+            
+            // 更新起始角度
+            startAngle += sliceAngle;
+        }
+    } else if (!m_hobbies.isEmpty()) {
+        // 如果没有权重数据，则使用原来的均分方式
+        // ... existing code ...
     }
 }
 
