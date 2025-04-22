@@ -32,7 +32,8 @@ MainWindow::MainWindow(QWidget *parent)
     portraitWindow(nullptr), // 初始化画像窗口指针
     m_rotationAngle(0.0),
     isLoading(false),
-    m_scale(1.0)
+    m_scale(1.0),
+    buttonsShown(false)
 {
     // 调整初始化顺序以匹配.h中的成员变量声明顺序
     ui->setupUi(this);
@@ -196,6 +197,11 @@ MainWindow::~MainWindow() {
     delete loadIndicator;
     delete portraitBtn; // 释放画像按钮
     delete portraitWindow; // 释放画像窗口
+    
+    // 清理问题按钮
+    for (QPushButton* btn : questionButtons) {
+        delete btn;
+    }
 }
 
 // 新增：封装发送请求逻辑
@@ -325,6 +331,12 @@ void MainWindow::showEvent(QShowEvent *event) {
         initSize.width(), initSize.height()
         ));
     m_sizeAnimation->start();
+    
+    // 如果按钮尚未显示，创建问题按钮
+    if (!buttonsShown) {
+        createQuestionButtons();
+        buttonsShown = true;
+    }
 }
 
 void MainWindow::toggleMaximize() {
@@ -496,6 +508,87 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 }
 
 // 在resizeEvent函数中添加读取逻辑
+// 新增：创建问题按钮
+void MainWindow::createQuestionButtons() {
+    // 初始化问题列表（如果为空）
+    if (questions.isEmpty()) {
+        questions << "1+1等于几？" << "2+2等于5吗？" << "3+3小于10吗？";
+    }
+    
+    // 清理之前可能存在的按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->deleteLater();
+        }
+    }
+    questionButtons.clear();
+    
+    // 创建新按钮
+    for (int i = 0; i < questions.size(); ++i) {
+        QPushButton *btn = new QPushButton(questions[i], this);
+        
+        // 设置按钮样式
+        btn->setStyleSheet(R"(
+            QPushButton {
+                background-color: #4A90E2;
+                color: white;
+                border-radius: 15px;
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #63B8FF;
+            }
+            QPushButton:pressed {
+                background-color: #3A7BFF;
+            }
+        )");
+        
+        // 设置按钮位置 - 修改为左上角垂直排列
+        int btnWidth = 200;
+        int btnHeight = 50;
+        int spacing = 20;
+        int startX = 20; // 左边距
+        int startY = titleBar->height() + 20; // 从标题栏下方开始，加上一些上边距
+        
+        btn->setGeometry(
+            startX,
+            startY + i * (btnHeight + spacing),
+            btnWidth,
+            btnHeight
+        );
+        
+        // 连接信号槽
+        connect(btn, &QPushButton::clicked, this, &MainWindow::onQuestionButtonClicked);
+        
+        btn->show();
+        questionButtons.append(btn);
+    }
+}
+
+// 新增：问题按钮点击处理
+void MainWindow::onQuestionButtonClicked() {
+    QPushButton *btn = qobject_cast<QPushButton*>(sender());
+    if (btn) {
+        QString question = btn->text();
+        
+        // 将问题发送到输入框
+        ui->lineEditInput->setText(question);
+        
+        // 触发发送按钮点击
+        on_pushButtonSend_clicked();
+        
+        // 隐藏所有按钮
+        for (QPushButton* button : questionButtons) {
+            if (button) {
+                button->hide();
+                button->deleteLater();
+            }
+        }
+        questionButtons.clear();
+    }
+}
+
 void MainWindow::resizeEvent(QResizeEvent *event) {
     QMainWindow::resizeEvent(event);
 

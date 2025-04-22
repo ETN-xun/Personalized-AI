@@ -51,11 +51,13 @@ private slots:
     void on_pushButtonSend_clicked();
     void onReplyFinished(QNetworkReply *reply);
     void toggleMaximize();
+    void onQuestionButtonClicked(); // 新增：问题按钮点击处理
 
 private:
     enum Direction { UP, DOWN, LEFT, RIGHT, LEFT_TOP, LEFT_BOTTOM, RIGHT_TOP, RIGHT_BOTTOM, NONE };
     int getMouseRegion(const QPoint &pos) const;
     void updateCursorShape(const QPoint &pos);
+    void createQuestionButtons(); // 新增：创建问题按钮
 
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
@@ -81,6 +83,11 @@ private:
     QLabel *loadIndicator;
     QStringList userHobbies; // 新增：存储用户选择的兴趣爱好
     bool isLoading = false;
+    
+    // 新增：问题按钮相关
+    QList<QPushButton*> questionButtons;
+    QStringList questions;
+    bool buttonsShown = false;
 
     double m_rotationAngle = 0.0;
 
