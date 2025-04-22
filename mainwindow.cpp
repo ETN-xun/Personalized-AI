@@ -640,11 +640,19 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     
-    QRect pieRect = rect().adjusted(10, 10, -10, -10);
-    int diameter = qMin(pieRect.width(), pieRect.height());
-    QRect adjustedRect = QRect(pieRect.x() + (pieRect.width() - diameter) / 2,
-                              pieRect.y() + (pieRect.height() - diameter) / 2,
-                              diameter, diameter);
+    // 计算饼图的尺寸和位置
+    int w = width();
+    int h = height();
+    int size = qMin(w, h) - 40; // 留出边距
+    QRect pieRect((w - size) / 2, (h - size) / 2, size, size);
+    
+    // 如果没有数据，绘制空饼图
+    if (m_hobbiesWithWeights.isEmpty()) {
+        painter.setPen(QPen(Qt::gray, 2));
+        painter.setBrush(Qt::lightGray);
+        painter.drawEllipse(pieRect);
+        return;
+    }
     
     // 计算总权重
     int totalWeight = 0;
@@ -652,44 +660,47 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
         totalWeight += pair.second;
     }
     
-    if (totalWeight == 0) return;
-    
     // 绘制饼图
     int startAngle = 0;
-    QStringList colors = {"#4A90E2", "#50C878", "#FF6B6B", "#FFD700", "#9370DB", "#20B2AA", "#FF8C00", "#FF69B4"};
+    QStringList colorList = {"#FF9999", "#66B3FF", "#99FF99", "#FFCC99", "#FF99CC", "#99CCFF", "#CC99FF", "#FFFF99"};
     
     for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
-        const auto &pair = m_hobbiesWithWeights[i];
-        int spanAngle = pair.second * 360 / totalWeight;
+        const auto &pair = m_hobbiesWithWeights.at(i);
+        int angle = pair.second * 5760 / totalWeight; // 5760 = 16 * 360
         
-        // 设置扇区颜色
-        QColor color(colors[i % colors.size()]);
+        QColor color(colorList.at(i % colorList.size()));
         painter.setBrush(color);
         painter.setPen(Qt::white);
+        painter.drawPie(pieRect, startAngle, angle);
         
-        // 绘制扇区
-        painter.drawPie(adjustedRect, startAngle * 16, spanAngle * 16);
+        // 计算文本位置（在扇形中心位置）
+        double middleAngle = startAngle + angle / 2;
+        double radians = middleAngle * M_PI / (16 * 180);
+        double radius = size / 3; // 调整文本距离圆心的距离
+        int x = pieRect.center().x() + radius * cos(radians);
+        int y = pieRect.center().y() - radius * sin(radians);
         
-        // 计算标签位置 - 修改这部分来修复标签位置
-        double angle = startAngle + spanAngle / 2;
-        double radians = angle * M_PI / 180.0;
-        
-        // 计算标签位置，使用扇区中间位置，但距离圆心有一定距离
-        double labelDistance = diameter * 0.35; // 调整这个值来控制标签到圆心的距离
-        int labelX = adjustedRect.center().x() + labelDistance * cos(radians);
-        int labelY = adjustedRect.center().y() - labelDistance * sin(radians);
-        
-        // 设置文本颜色和字体
-        painter.setPen(Qt::black);
+        // 设置文本样式
         QFont font = painter.font();
-        font.setBold(true);
+        font.setPointSize(14); // 增大字号，原来可能是较小的值
         painter.setFont(font);
         
-        // 绘制标签文本，确保文本居中显示在计算出的位置
-        QRect textRect(labelX - 50, labelY - 10, 100, 20);
-        painter.drawText(textRect, Qt::AlignCenter, pair.first);
+        // 测量文本尺寸
+        QFontMetrics fm(font);
+        QString text = pair.first;
+        QRect textRect = fm.boundingRect(text);
+        textRect.moveCenter(QPoint(x, y));
         
-        startAngle += spanAngle;
+        // 绘制文本背景（半透明白色圆角矩形）
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(255, 255, 255, 180)); // 半透明白色
+        painter.drawRoundedRect(textRect.adjusted(-10, -5, 10, 5), 10, 10); // 调整大小并设置圆角
+        
+        // 绘制文本
+        painter.setPen(Qt::black);
+        painter.drawText(textRect, Qt::AlignCenter, text);
+        
+        startAngle += angle;
     }
 }
 
