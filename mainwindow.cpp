@@ -642,44 +642,48 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
         portraitWindow->hide();
         
         // 连接信号
+        // 在portraitBtn的点击事件处理中
         connect(portraitBtn, &QPushButton::clicked, this, [this]() {
-            // 添加路径声明
-            QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-            QList<QPair<QString, int>> hobbiesWithWeights;
-            QFile file(path + "/hobbies.json");
-            
-            if (file.open(QIODevice::ReadOnly)) {
-                QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-                if (doc.isArray()) {
-                    QJsonArray array = doc.array();
-                    foreach (const QJsonValue &value, array) {
-                        QJsonObject obj = value.toObject();
-                        QString name = obj["name"].toString();
-                        int weight = obj["weight"].toInt();
+        // 添加路径声明
+        QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        QList<QPair<QString, int>> hobbiesWithWeights;
+        QFile file(path + "/hobbies.json");
+        
+        if (file.open(QIODevice::ReadOnly)) {
+            QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+            if (doc.isArray()) {
+                QJsonArray array = doc.array();
+                foreach (const QJsonValue &value, array) {
+                    QJsonObject obj = value.toObject();
+                    QString name = obj["name"].toString();
+                    int weight = obj["weight"].toInt();
+                    // 只添加权重大于0的兴趣爱好
+                    if (weight > 0) {
                         hobbiesWithWeights.append(qMakePair(name, weight));
                     }
                 }
-                file.close();
             }
-            
-            // 更新饼图数据
-            if (portraitWindow) {
-                QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
-                if (layout && layout->count() > 0) {
-                    PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget());
-                    if (pieChart) {
-                        pieChart->setHobbiesWithWeights(hobbiesWithWeights);
-                        pieChart->update(); // 强制重绘
-                    }
+            file.close();
+        }
+        
+        // 更新饼图数据
+        if (portraitWindow) {
+            QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
+            if (layout && layout->count() > 0) {
+                PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget());
+                if (pieChart) {
+                    pieChart->setHobbiesWithWeights(hobbiesWithWeights);
+                    pieChart->update(); // 强制重绘
                 }
             }
-            
-            // 显示模态窗口
-            if (portraitWindow->isHidden()) {
-                portraitWindow->show();
-            } else {
-                portraitWindow->hide();
-            }
+        }
+        
+        // 显示模态窗口
+        if (portraitWindow->isHidden()) {
+            portraitWindow->show();
+        } else {
+            portraitWindow->hide();
+        }
         });
     }
 }
@@ -719,7 +723,10 @@ void MainWindow::setUserHobbies(const QStringList &hobbies) {
                     auto it = std::find_if(hobbyWeights.begin(), hobbyWeights.end(),
                         [&hobby](const QPair<QString, int>& item) { return item.first == hobby; });
                     int weight = (it != hobbyWeights.end()) ? it->second : 1;
-                    hobbiesWithWeights.append(qMakePair(hobby, weight));
+                    // 只添加权重大于0的兴趣爱好
+                    if (weight > 0) {
+                        hobbiesWithWeights.append(qMakePair(hobby, weight));
+                    }
                 }
                 pieChart->setHobbiesWithWeights(hobbiesWithWeights);
             }

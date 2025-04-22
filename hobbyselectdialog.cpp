@@ -109,12 +109,19 @@ void HobbySelectDialog::setupUI() {
     )");
     // 修改确定按钮的点击事件
     connect(confirmBtn, &QPushButton::clicked, this, [this]() {
-        // 保存到JSON文件（已修复类型识别问题）
+        // 获取所有可用的兴趣列表
+        QStringList allHobbies;
+        for (QPushButton* btn : hobbyButtons) {
+            allHobbies.append(btn->text());
+        }
+        
+        // 创建JSON数组，包含所有兴趣
         QJsonArray hobbiesArray;
-        foreach (const QString &hobby, selectedHobbies) {
+        foreach (const QString &hobby, allHobbies) {
             QJsonObject obj;
-            obj["name"] = hobby;  // 保持QString类型赋值
-            obj["weight"] = 1;  // 添加默认权重
+            obj["name"] = hobby;
+            // 如果兴趣在已选列表中，权重为1，否则为0
+            obj["weight"] = selectedHobbies.contains(hobby) ? 1 : 0;
             hobbiesArray.append(obj);
         }
         
