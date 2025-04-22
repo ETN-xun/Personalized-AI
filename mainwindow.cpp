@@ -10,9 +10,11 @@
 #include <QWindow>
 #include <QHBoxLayout>
 #include <QApplication>
-// 在文件顶部添加头文件引用
+#include <QTimer>  // 添加QTimer头文件
 #include <QStandardPaths>
 #include <QFile>
+#include <QRandomGenerator>
+#include <QEventLoop>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -182,6 +184,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 连接网络请求完成信号到槽
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onReplyFinished);
+    
+    // 设置窗口标题
+    titleLabel->setText("个性化AI助手");
 }
 
 MainWindow::~MainWindow() {
@@ -239,18 +244,27 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
 }
 
 void MainWindow::on_pushButtonSend_clicked() {
-    QString userInput = ui->lineEditInput->text().trimmed();
-    if (userInput.isEmpty()) return;
+    QString question = ui->lineEditInput->text().trimmed();
+    if (question.isEmpty()) return;
 
-    ui->textEditChat->append(tr("You: %1").arg(userInput));
+    // 隐藏所有问题按钮并停止生成
+    for (QPushButton* button : questionButtons) {
+        if (button) {
+            button->hide();
+            button->deleteLater();
+        }
+    }
+    questionButtons.clear();
+    isLoading = false;
+    rotationAnimation->stop();
+    loadIndicator->clear();
+    
+    // 原有代码继续执行
+    ui->textEditChat->append("<span style='color:#4A90E2; font-weight:bold;'>我:</span> " + question);
     ui->lineEditInput->clear();
-
-    // 启动加载动画
-    isLoading = true;
-    rotationAnimation->start();
-
-    // 先发送优化请求
-    sendChatRequest(userInput, true);
+    
+    // 发送聊天请求
+    sendChatRequest(question, false);
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
@@ -332,11 +346,18 @@ void MainWindow::showEvent(QShowEvent *event) {
         ));
     m_sizeAnimation->start();
     
-    // 如果按钮尚未显示，创建问题按钮
-    if (!buttonsShown) {
-        createQuestionButtons();
-        buttonsShown = true;
-    }
+    // 显示加载指示器
+    isLoading = true;
+    rotationAnimation->start();
+    
+    // 使用QTimer延迟创建问题按钮，让窗口先显示出来
+    QTimer::singleShot(100, this, [this]() {
+        // 如果按钮尚未显示，创建问题按钮
+        if (!buttonsShown) {
+            createQuestionButtons();
+            buttonsShown = true;
+        }
+    });
 }
 
 void MainWindow::toggleMaximize() {
@@ -510,8 +531,151 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 // 在resizeEvent函数中添加读取逻辑
 // 新增：创建问题按钮
 void MainWindow::createQuestionButtons() {
-    // 初始化问题列表（如果为空）
-    if (questions.isEmpty()) {
+    // 从hobbies.json读取兴趣及其权重
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(path + "/hobbies.json");
+    QList<QPair<QString, int>> hobbyWeights;
+    QStringList zeroWeightHobbies;
+    QStringList positiveWeightHobbies;
+    QList<int> positiveWeights;
+    int totalWeight = 0;
+    
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &value : array) {
+                QJsonObject obj = value.toObject();
+                QString hobby = obj["name"].toString();
+                int weight = obj["weight"].toInt();
+                
+                if (weight == 0) {
+                    zeroWeightHobbies.append(hobby);
+                } else {
+                    positiveWeightHobbies.append(hobby);
+                    positiveWeights.append(weight);
+                    totalWeight += weight;
+                }
+            }
+        }
+        file.close();
+    }
+    
+    // 生成三个问题
+    QStringList newQuestions;
+    
+    // 定义一些角度和修饰词，增加问题的多样性
+    QStringList angles = {
+        "最新趋势", "入门建议", "高级技巧", "有趣事实", 
+        "历史发展", "未来展望", "常见误区", "专业术语",
+        "经典案例", "创新思路", "实用技巧", "奇闻轶事"
+    };
+    
+    for (int i = 0; i < 3; i++) {
+        QString selectedHobby;
+        
+        // 10%概率选择权重为0的兴趣，90%概率按权重选择权重大于0的兴趣
+        bool useZeroWeight = (QRandomGenerator::global()->bounded(100) < 10) && !zeroWeightHobbies.isEmpty();
+        
+        if (useZeroWeight) {
+            // 随机选择一个权重为0的兴趣
+            int randomIndex = QRandomGenerator::global()->bounded(zeroWeightHobbies.size());
+            selectedHobby = zeroWeightHobbies.at(randomIndex);
+        } else if (!positiveWeightHobbies.isEmpty()) {
+            // 按权重随机选择一个权重大于0的兴趣
+            int randomValue = QRandomGenerator::global()->bounded(totalWeight);
+            int accumulatedWeight = 0;
+            
+            for (int j = 0; j < positiveWeightHobbies.size(); j++) {
+                accumulatedWeight += positiveWeights.at(j);
+                if (randomValue < accumulatedWeight) {
+                    selectedHobby = positiveWeightHobbies.at(j);
+                    break;
+                }
+            }
+        } else {
+            // 如果没有任何兴趣，使用默认问题
+            newQuestions << "1+1等于几？" << "2+2等于5吗？" << "3+3小于10吗？";
+            break;
+        }
+        
+        // 使用AI生成与所选兴趣相关的问题
+        if (!selectedHobby.isEmpty()) {
+            // 随机选择一个角度
+            QString angle = angles.at(QRandomGenerator::global()->bounded(angles.size()));
+            
+            // 随机生成温度值，范围在0.7-1.0之间，增加多样性
+            double temperature = 0.7 + (QRandomGenerator::global()->generateDouble() * 0.3);
+            
+            // 添加时间戳和随机数，确保每次请求都不同
+            QString uniqueId = QString::number(QDateTime::currentMSecsSinceEpoch()) + 
+                               QString::number(QRandomGenerator::global()->generate());
+            
+            // 构建AI请求
+            QJsonObject json{
+                {"model", "deepseek-chat"},
+                {"temperature", temperature},
+                {"max_tokens", 100},
+            };
+            
+            // 改进系统提示词，强调多样性和创新性
+            QJsonArray messages = {
+                QJsonObject{{"role", "system"}, {"content", "你是一个创意问题生成器。请根据给定的兴趣爱好和角度，生成一个独特、有创意且引人思考的问题。问题必须是原创的，不要重复常见问题。直接输出问题，不要有任何前缀或解释。问题应该简洁有趣，字数在20字以内。每次生成的问题都应该与之前不同。"}},
+                QJsonObject{{"role", "user"}, {"content", "兴趣爱好：" + selectedHobby + "，角度：" + angle + "，唯一ID：" + uniqueId}}
+            };
+            
+            json["messages"] = messages;
+            
+            QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
+            request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+            request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8().data());
+            
+            // 同步请求（简化实现，实际应用中应考虑异步处理）
+            QNetworkAccessManager tempManager;
+            QNetworkReply *reply = tempManager.post(request, QJsonDocument(json).toJson());
+            
+            // 等待响应
+            QEventLoop loop;
+            connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+            loop.exec();
+            
+            if (reply->error() == QNetworkReply::NoError) {
+                QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
+                QJsonObject responseObj = responseDoc.object();
+                if (responseObj.contains("choices") && responseObj["choices"].isArray()) {
+                    QJsonArray choices = responseObj["choices"].toArray();
+                    if (!choices.isEmpty() && choices[0].isObject()) {
+                        QJsonObject choice = choices[0].toObject();
+                        if (choice.contains("message") && choice["message"].isObject()) {
+                            QJsonObject message = choice["message"].toObject();
+                            if (message.contains("content")) {
+                                QString question = message["content"].toString().trimmed();
+                                newQuestions.append(question);
+                            }
+                        }
+                    }
+                }
+            } else {
+                // 如果AI请求失败，使用默认问题格式，但添加随机元素
+                QStringList defaultFormats = {
+                    "关于" + selectedHobby + "的" + angle + "是什么？",
+                    selectedHobby + "中有哪些" + angle + "？",
+                    "你对" + selectedHobby + "的" + angle + "有何看法？",
+                    selectedHobby + "领域最新的" + angle + "是什么？"
+                };
+                int randomIndex = QRandomGenerator::global()->bounded(defaultFormats.size());
+                newQuestions.append(defaultFormats.at(randomIndex));
+            }
+            
+            reply->deleteLater();
+        }
+    }
+    
+    // 如果成功生成了问题，更新问题列表
+    if (!newQuestions.isEmpty()) {
+        questions = newQuestions;
+    } else if (questions.isEmpty()) {
+        // 如果没有生成问题且问题列表为空，使用默认问题
         questions << "1+1等于几？" << "2+2等于5吗？" << "3+3小于10吗？";
     }
     
@@ -545,11 +709,19 @@ void MainWindow::createQuestionButtons() {
         )");
         
         // 设置按钮位置 - 修改为左上角垂直排列
-        int btnWidth = 200;
         int btnHeight = 50;
         int spacing = 20;
         int startX = 20; // 左边距
         int startY = titleBar->height() + 20; // 从标题栏下方开始，加上一些上边距
+        
+        // 根据文本长度计算按钮宽度
+        QFontMetrics fontMetrics(btn->font());
+        int textWidth = fontMetrics.horizontalAdvance(questions[i]);
+        int btnWidth = textWidth + 80; // 文本宽度加上左右内边距
+        
+        // 设置最小和最大宽度限制
+        btnWidth = qMax(200, btnWidth); // 最小宽度为200
+        btnWidth = qMin(600, btnWidth); // 最大宽度从400改为600
         
         btn->setGeometry(
             startX,
@@ -564,6 +736,11 @@ void MainWindow::createQuestionButtons() {
         btn->show();
         questionButtons.append(btn);
     }
+    
+    // 生成完成后，停止加载动画
+    isLoading = false;
+    rotationAnimation->stop();
+    loadIndicator->clear();
 }
 
 // 新增：问题按钮点击处理
@@ -575,10 +752,7 @@ void MainWindow::onQuestionButtonClicked() {
         // 将问题发送到输入框
         ui->lineEditInput->setText(question);
         
-        // 触发发送按钮点击
-        on_pushButtonSend_clicked();
-        
-        // 隐藏所有按钮
+        // 隐藏所有按钮并停止生成
         for (QPushButton* button : questionButtons) {
             if (button) {
                 button->hide();
@@ -586,6 +760,12 @@ void MainWindow::onQuestionButtonClicked() {
             }
         }
         questionButtons.clear();
+        isLoading = false;
+        rotationAnimation->stop();
+        loadIndicator->clear();
+        
+        // 触发发送按钮点击
+        on_pushButtonSend_clicked();
     }
 }
 
