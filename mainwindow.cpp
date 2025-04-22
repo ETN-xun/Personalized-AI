@@ -271,9 +271,11 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         // 停止加载动画
+        /*
         isLoading = false;
         rotationAnimation->stop();
         loadIndicator->clear();
+        */
         // ... existing code ...
     });
     reply->setProperty("requestType", isOptimization ? "optimization" : "chat");
@@ -308,9 +310,11 @@ void MainWindow::on_pushButtonSend_clicked() {
     // 发送聊天请求
     sendChatRequest(input, false);
     // 停止加载动画
+    /*
     isLoading = false;
     rotationAnimation->stop();
     loadIndicator->clear();
+    */
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
@@ -378,9 +382,11 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
     }
     
     // 停止加载动画
+    /*
     isLoading = false;
     rotationAnimation->stop();
     loadIndicator->clear();
+    */
 
     reply->deleteLater();
     update();
@@ -597,9 +603,11 @@ void MainWindow::createQuestionButtons() {
     // 如果用户已经提问或者按钮已经显示过，则不创建按钮
     if (hasAskedQuestion || buttonsShown) {
         // 确保停止加载动画
+        /*
         isLoading = false;
         rotationAnimation->stop();
         loadIndicator->clear();
+        */
         return;
     }
     
@@ -814,9 +822,11 @@ void MainWindow::createQuestionButtons() {
         questionButtons.append(btn);
     }
     // 添加回这三行代码，确保加载动画停止
+    /*
     isLoading = false;
     rotationAnimation->stop();
     loadIndicator->clear();
+    */
 }
 
 // 新增：问题按钮点击处理
