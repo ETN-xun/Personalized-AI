@@ -531,62 +531,66 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
             }
         }
         
-        // 修复1：设置主窗口为父对象
-        portraitWindow = new QWidget(this);  // 修改为this作为父对象
-        portraitWindow->setWindowFlag(Qt::Window); // 添加窗口标志
+        // 修复：创建独立窗口而不是子窗口
+        portraitWindow = new QWidget(nullptr);  // 使用nullptr作为父对象
+        portraitWindow->setWindowFlags(Qt::Window); // 设置为独立窗口
         portraitWindow->setWindowTitle("用户画像分析");
         portraitWindow->resize(400, 400);
         
-        // 修复2：添加布局边距
+        // 添加布局和饼图组件
         QVBoxLayout *layout = new QVBoxLayout(portraitWindow);
-        layout->setContentsMargins(20, 20, 20, 20); // 增加边距
-        layout->addWidget(new PieChartWidget);
+        layout->setContentsMargins(20, 20, 20, 20);
         
-        // 移除添加标签的代码
-        // QLabel *label = new QLabel("用户画像分布 (A:蓝色, B:绿色, C:红色)");
-        // label->setAlignment(Qt::AlignCenter);
-        // layout->addWidget(label);
-    
-        // 修复3：确保窗口初始隐藏
+        // 创建并添加饼图组件
+        PieChartWidget *pieChart = new PieChartWidget(portraitWindow);
+        layout->addWidget(pieChart);
+        
+        // 确保窗口初始隐藏
         portraitWindow->hide();
-    } // <-- 添加缺失的闭合花括号
+        
+        // 连接信号
+        connect(portraitBtn, &QPushButton::clicked, this, [this]() {
+            // 添加路径声明
+            QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            QList<QPair<QString, int>> hobbiesWithWeights;
+            QFile file(path + "/hobbies.json");
+            
+            if (file.open(QIODevice::ReadOnly)) {
+                QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+                if (doc.isArray()) {
+                    QJsonArray array = doc.array();
+                    foreach (const QJsonValue &value, array) {
+                        QJsonObject obj = value.toObject();
+                        QString name = obj["name"].toString();
+                        int weight = obj["weight"].toInt();
+                        hobbiesWithWeights.append(qMakePair(name, weight));
+                    }
+                }
+                file.close();
+            }
+            
+            // 更新饼图数据
+            if (portraitWindow) {
+                QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
+                if (layout && layout->count() > 0) {
+                    PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget());
+                    if (pieChart) {
+                        pieChart->setHobbiesWithWeights(hobbiesWithWeights);
+                        pieChart->update(); // 强制重绘
+                    }
+                }
+            }
+            
+            // 显示模态窗口
+            if (portraitWindow->isHidden()) {
+                portraitWindow->show();
+            } else {
+                portraitWindow->hide();
+            }
+        });
+    }
+}
 
-    // 修复4：连接信号（移到条件块外部）
-    connect(portraitBtn, &QPushButton::clicked, this, [this]() {
-    // 添加路径声明
-    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QList<QPair<QString, int>> hobbiesWithWeights;
-    QFile file(path + "/hobbies.json");
-    
-    if (file.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        if (doc.isArray()) {
-            QJsonArray array = doc.array();
-            foreach (const QJsonValue &value, array) {
-                QJsonObject obj = value.toObject();
-                QString name = obj["name"].toString();
-                int weight = obj["weight"].toInt();
-                hobbiesWithWeights.append(qMakePair(name, weight));
-            }
-        }
-        file.close();
-    }
-    
-    // 更新饼图数据
-    if (portraitWindow) {
-        QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(portraitWindow->layout());
-        if (layout) {
-            if (PieChartWidget* pieChart = qobject_cast<PieChartWidget*>(layout->itemAt(0)->widget())) {
-                pieChart->setHobbiesWithWeights(hobbiesWithWeights);
-                pieChart->update(); // 强制重绘
-            }
-        }
-    }
-    
-    portraitWindow->setWindowModality(Qt::ApplicationModal);
-    portraitWindow->isHidden() ? portraitWindow->show() : portraitWindow->hide();
-    });
-} // <-- 确保这是resizeEvent函数的闭合花括号
 void MainWindow::setUserHobbies(const QStringList &hobbies) {
     userHobbies = hobbies;
 
@@ -634,90 +638,58 @@ void MainWindow::setUserHobbies(const QStringList &hobbies) {
 
 void PieChartWidget::paintEvent(QPaintEvent *) {
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing); // 添加抗锯齿优化
-
-    // 检查是否有带权重的兴趣爱好数据
-    if (!m_hobbiesWithWeights.isEmpty()) {
-        // 使用带权重的数据绘制饼图
-        QRectF rect(10, 10, width()-20, height()-20);
-        // 调整饼状图颜色为更柔和的色调
-        QVector<QColor> colors{
-            QColor("#66BB6A"), QColor("#42A5F5"), QColor("#FFA726"), 
-            QColor("#EC407A"), QColor("#7E57C2"), QColor("#26A69A"), 
-            QColor("#9575CD"), QColor("#FFB74D")
-        };
+    painter.setRenderHint(QPainter::Antialiasing);
+    
+    QRect pieRect = rect().adjusted(10, 10, -10, -10);
+    int diameter = qMin(pieRect.width(), pieRect.height());
+    QRect adjustedRect = QRect(pieRect.x() + (pieRect.width() - diameter) / 2,
+                              pieRect.y() + (pieRect.height() - diameter) / 2,
+                              diameter, diameter);
+    
+    // 计算总权重
+    int totalWeight = 0;
+    for (const auto &pair : m_hobbiesWithWeights) {
+        totalWeight += pair.second;
+    }
+    
+    if (totalWeight == 0) return;
+    
+    // 绘制饼图
+    int startAngle = 0;
+    QStringList colors = {"#4A90E2", "#50C878", "#FF6B6B", "#FFD700", "#9370DB", "#20B2AA", "#FF8C00", "#FF69B4"};
+    
+    for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
+        const auto &pair = m_hobbiesWithWeights[i];
+        int spanAngle = pair.second * 360 / totalWeight;
         
-        // 计算总权重
-        int totalWeight = 0;
-        for (const auto &hobby : m_hobbiesWithWeights) {
-            totalWeight += hobby.second;
-        }
+        // 设置扇区颜色
+        QColor color(colors[i % colors.size()]);
+        painter.setBrush(color);
+        painter.setPen(Qt::white);
         
-        // 角度单位为1/16度
-        const double totalDegrees = 360.0 * 16;
-        int startAngle = 0;
+        // 绘制扇区
+        painter.drawPie(adjustedRect, startAngle * 16, spanAngle * 16);
         
-        // 先绘制饼图
-        for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(colors[i % colors.size()]);
-            
-            // 根据权重计算扇形角度
-            int sliceAngle = static_cast<int>((m_hobbiesWithWeights[i].second * totalDegrees) / totalWeight);
-            painter.drawPie(rect, startAngle, sliceAngle);
-            
-            // 更新起始角度
-            startAngle += sliceAngle;
-        }
+        // 计算标签位置 - 修改这部分来修复标签位置
+        double angle = startAngle + spanAngle / 2;
+        double radians = angle * M_PI / 180.0;
         
-        // 文本位置优化，减小 textRadius 让文字离中心更近
-        const double textRadius = 0.6 * qMin(rect.width(), rect.height()) / 2;
+        // 计算标签位置，使用扇区中间位置，但距离圆心有一定距离
+        double labelDistance = diameter * 0.35; // 调整这个值来控制标签到圆心的距离
+        int labelX = adjustedRect.center().x() + labelDistance * cos(radians);
+        int labelY = adjustedRect.center().y() - labelDistance * sin(radians);
         
-        // 增大文字字号
+        // 设置文本颜色和字体
+        painter.setPen(Qt::black);
         QFont font = painter.font();
-        font.setPointSize(12); // 可根据需要调整字号
+        font.setBold(true);
         painter.setFont(font);
         
-        // 再绘制所有文字及其背景框
-        startAngle = 0;
-        for (int i = 0; i < m_hobbiesWithWeights.size(); ++i) {
-            // 计算每个扇形的角度
-            int sliceAngle = static_cast<int>((m_hobbiesWithWeights[i].second * totalDegrees) / totalWeight);
-            
-            // 计算每个扇形的中心角度
-            int centerAngle = startAngle + sliceAngle / 2;
-            
-            // 将角度转换为弧度
-            double rad = qDegreesToRadians(static_cast<double>(centerAngle / 16));
-            
-            // 计算文字的位置
-            QPointF textPos(
-                rect.center().x() + textRadius * cos(rad),
-                rect.center().y() + textRadius * sin(rad)
-            );
-            
-            // 文本边界框优化，减小安全边距
-            QFontMetrics fm(painter.font());
-            QRect textRect = fm.boundingRect(m_hobbiesWithWeights[i].first);
-            // 减小安全边距
-            textRect.adjust(-10, -5, 10, 5); 
-            textRect.moveCenter(textPos.toPoint());
-            
-            // 绘制没有边框的圆角矩形文本框
-            painter.setPen(Qt::NoPen); // 无边框
-            painter.setBrush(QColor(255, 255, 255, 200)); // 设置半透明白色背景
-            painter.drawRoundedRect(textRect, 5, 5); // 绘制圆角矩形，圆角半径为 5
-            
-            // 绘制文字
-            painter.setPen(Qt::black);
-            painter.drawText(textRect, Qt::AlignCenter, m_hobbiesWithWeights[i].first);
-            
-            // 更新起始角度
-            startAngle += sliceAngle;
-        }
-    } else if (!m_hobbies.isEmpty()) {
-        // 如果没有权重数据，则使用原来的均分方式
-        // ... existing code ...
+        // 绘制标签文本，确保文本居中显示在计算出的位置
+        QRect textRect(labelX - 50, labelY - 10, 100, 20);
+        painter.drawText(textRect, Qt::AlignCenter, pair.first);
+        
+        startAngle += spanAngle;
     }
 }
 
