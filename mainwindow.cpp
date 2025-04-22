@@ -35,7 +35,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_rotationAngle(0.0),
     isLoading(false),
     m_scale(1.0),
-    buttonsShown(false)
+    buttonsShown(false),
+    hasAskedQuestion(false)
 {
     // 调整初始化顺序以匹配.h中的成员变量声明顺序
     ui->setupUi(this);
@@ -145,7 +146,21 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:hover { background: #63B8FF; }
         QPushButton:pressed { background: #3A7BFF; }
     )");
-    connect(ui->lineEditInput, &QLineEdit::returnPressed, ui->pushButtonSend, &QPushButton::click);
+    connect(ui->lineEditInput, &QLineEdit::returnPressed, this, [this]() {
+        // 设置标志，表示用户已经提过问题
+        hasAskedQuestion = true;
+        
+        // 隐藏所有问题按钮
+        for (QPushButton* btn : questionButtons) {
+            if (btn) {
+                btn->hide();
+            }
+        }
+        buttonsShown = true; // 标记为已显示过，防止再次创建
+        
+        // 触发发送按钮点击
+        ui->pushButtonSend->click();
+    });
 
     // 加载指示器动画连接
     connect(rotationAnimation, &QVariantAnimation::valueChanged, [this]() {
@@ -211,6 +226,22 @@ MainWindow::~MainWindow() {
 
 // 新增：封装发送请求逻辑
 void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
+    // 设置标志，防止再次显示问题按钮
+    buttonsShown = true;
+    hasAskedQuestion = true;  // 确保记录用户已提问
+    
+    // 隐藏所有问题按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
+        }
+    }
+    
+    // 确保停止加载动画
+    isLoading = false;
+    rotationAnimation->stop();
+    loadIndicator->clear();
+    
     QJsonObject json{
                      {"model", "deepseek-chat"},
                      {"temperature", 0.5},
@@ -244,27 +275,32 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
 }
 
 void MainWindow::on_pushButtonSend_clicked() {
-    QString question = ui->lineEditInput->text().trimmed();
-    if (question.isEmpty()) return;
+    QString input = ui->lineEditInput->text().trimmed();
+    if (input.isEmpty()) return;
 
-    // 隐藏所有问题按钮并停止生成
-    for (QPushButton* button : questionButtons) {
-        if (button) {
-            button->hide();
-            button->deleteLater();
+    // 设置加载状态
+    isLoading = true;
+    rotationAnimation->start();
+    
+    // 设置标志，表示用户已经提过问题
+    hasAskedQuestion = true;
+
+    // 隐藏所有问题按钮并设置标志，防止再次显示
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
         }
     }
-    questionButtons.clear();
-    isLoading = false;
-    rotationAnimation->stop();
-    loadIndicator->clear();
-    
-    // 原有代码继续执行
-    ui->textEditChat->append("<span style='color:#4A90E2; font-weight:bold;'>我:</span> " + question);
+    buttonsShown = true; // 标记为已显示过，防止再次创建
+
+    // 清空输入框并添加用户消息到聊天窗口
     ui->lineEditInput->clear();
-    
+    ui->textEditChat->append("<div style='color:#4A90E2; font-weight:bold;'>你:</div>");
+    ui->textEditChat->append("<div style='margin-left:10px;'>" + input + "</div>");
+    ui->textEditChat->append("<br>");
+
     // 发送聊天请求
-    sendChatRequest(question, false);
+    sendChatRequest(input, false);
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
@@ -321,6 +357,21 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
         }
     }
 
+    // 在函数的最后，确保设置hasAskedQuestion为true
+    hasAskedQuestion = true;
+    
+    // 隐藏所有问题按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
+        }
+    }
+    
+    // 停止加载动画
+    isLoading = false;
+    rotationAnimation->stop();
+    loadIndicator->clear();
+
     reply->deleteLater();
     update();
 }
@@ -350,14 +401,25 @@ void MainWindow::showEvent(QShowEvent *event) {
     isLoading = true;
     rotationAnimation->start();
     
-    // 使用QTimer延迟创建问题按钮，让窗口先显示出来
-    QTimer::singleShot(100, this, [this]() {
-        // 如果按钮尚未显示，创建问题按钮
-        if (!buttonsShown) {
-            createQuestionButtons();
-            buttonsShown = true;
-        }
-    });
+    // 修改定时器逻辑，如果用户已经提问过，直接停止加载动画而不创建定时器
+    if (hasAskedQuestion || buttonsShown) {
+        isLoading = false;
+        rotationAnimation->stop();
+        loadIndicator->clear();
+    } else {
+        // 使用QTimer延迟创建问题按钮，让窗口先显示出来
+        QTimer::singleShot(100, this, [this]() {
+            // 确保在延迟执行时再次检查hasAskedQuestion标志
+            if (!hasAskedQuestion && !buttonsShown) {
+                createQuestionButtons();
+            } else {
+                // 如果用户已经提问，停止加载动画
+                isLoading = false;
+                rotationAnimation->stop();
+                loadIndicator->clear();
+            }
+        });
+    }
 }
 
 void MainWindow::toggleMaximize() {
@@ -531,6 +593,15 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
 // 在resizeEvent函数中添加读取逻辑
 // 新增：创建问题按钮
 void MainWindow::createQuestionButtons() {
+    // 如果用户已经提问或者按钮已经显示过，则不创建按钮
+    if (hasAskedQuestion || buttonsShown) {
+        // 确保停止加载动画
+        isLoading = false;
+        rotationAnimation->stop();
+        loadIndicator->clear();
+        return;
+    }
+    
     // 从hobbies.json读取兴趣及其权重
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QFile file(path + "/hobbies.json");
@@ -733,11 +804,15 @@ void MainWindow::createQuestionButtons() {
         // 连接信号槽
         connect(btn, &QPushButton::clicked, this, &MainWindow::onQuestionButtonClicked);
         
-        btn->show();
+        if(!hasAskedQuestion)
+        {
+            btn->show();
+        }else{
+            btn->hide();
+        }
         questionButtons.append(btn);
     }
-    
-    // 生成完成后，停止加载动画
+    // 添加回这三行代码，确保加载动画停止
     isLoading = false;
     rotationAnimation->stop();
     loadIndicator->clear();
@@ -745,28 +820,35 @@ void MainWindow::createQuestionButtons() {
 
 // 新增：问题按钮点击处理
 void MainWindow::onQuestionButtonClicked() {
-    QPushButton *btn = qobject_cast<QPushButton*>(sender());
-    if (btn) {
-        QString question = btn->text();
-        
-        // 将问题发送到输入框
-        ui->lineEditInput->setText(question);
-        
-        // 隐藏所有按钮并停止生成
-        for (QPushButton* button : questionButtons) {
-            if (button) {
-                button->hide();
-                button->deleteLater();
-            }
+    // 获取发送者按钮
+    QPushButton *button = qobject_cast<QPushButton*>(sender());
+    if (!button) return;
+    
+    // 获取按钮文本作为问题
+    QString question = button->text();
+    
+    // 设置加载状态
+    isLoading = true;
+    rotationAnimation->start();
+    
+    // 隐藏所有问题按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
         }
-        questionButtons.clear();
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-        
-        // 触发发送按钮点击
-        on_pushButtonSend_clicked();
     }
+    
+    // 设置标志，防止再次显示问题按钮
+    buttonsShown = true;
+    hasAskedQuestion = true;  // 添加这一行，确保记录用户已提问
+    
+    // 添加用户消息到聊天窗口
+    ui->textEditChat->append("<div style='color:#4A90E2; font-weight:bold;'>你:</div>");
+    ui->textEditChat->append("<div style='margin-left:10px;'>" + question + "</div>");
+    ui->textEditChat->append("<br>");
+    
+    // 发送优化请求
+    sendChatRequest(question, true);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {

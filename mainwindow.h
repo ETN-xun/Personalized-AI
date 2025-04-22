@@ -88,6 +88,7 @@ private:
     QList<QPushButton*> questionButtons;
     QStringList questions;
     bool buttonsShown = false;
+    bool hasAskedQuestion = false;  // 新增：记录用户是否已经提过问题
 
     double m_rotationAngle = 0.0;
 
