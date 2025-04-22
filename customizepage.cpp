@@ -6,9 +6,18 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QLabel>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 CustomizePage::CustomizePage(QWidget *parent)
-    : QWidget(parent)
+    : QWidget(parent),
+    networkManager(new QNetworkAccessManager(this)),
+    apiKey("sk-eea6568b51c74da88e91f32f91485ab9"), // 使用与主窗口相同的API密钥
+    isFirstQuestion(true) // 初始化为第一次提问
 {
     setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     setAttribute(Qt::WA_DeleteOnClose);
@@ -26,6 +35,7 @@ CustomizePage::CustomizePage(QWidget *parent)
 
 CustomizePage::~CustomizePage()
 {
+    delete networkManager;
 }
 
 void CustomizePage::setupUI()
@@ -58,7 +68,7 @@ void CustomizePage::setupUI()
     mainLayout->addLayout(titleLayout);
     
     // 添加文本展示框
-    QTextEdit *instructionText = new QTextEdit(this);
+    instructionText = new QTextEdit(this); // 修改为类成员变量
     instructionText->setReadOnly(true);
     instructionText->setText("请填写您想要解决的问题，我将为您量身定制您的专属方案。");
     instructionText->setStyleSheet(R"(
@@ -77,7 +87,7 @@ void CustomizePage::setupUI()
     QHBoxLayout *inputLayout = new QHBoxLayout();
     
     // 添加对话框（输入框）
-    QLineEdit *inputField = new QLineEdit(this);
+    inputField = new QLineEdit(this); // 修改为类成员变量
     inputField->setPlaceholderText("请在此输入您的问题...");
     inputField->setStyleSheet(R"(
         QLineEdit {
@@ -93,7 +103,7 @@ void CustomizePage::setupUI()
     )");
     
     // 添加确定按钮
-    QPushButton *confirmBtn = new QPushButton("确定", this);
+    confirmBtn = new QPushButton("确定", this); // 修改为类成员变量
     confirmBtn->setStyleSheet(R"(
         QPushButton {
             background: #4A90E2;
@@ -118,20 +128,7 @@ void CustomizePage::setupUI()
     mainLayout->addLayout(inputLayout, 1); // 占1/4的空间
     
     // 连接确定按钮的点击信号
-    connect(confirmBtn, &QPushButton::clicked, this, [this, inputField, instructionText]() {
-        QString userInput = inputField->text().trimmed();
-        if (!userInput.isEmpty()) {
-            // 更新文本展示框内容，显示用户输入和回应
-            instructionText->append("\n\n您的问题: " + userInput);
-            instructionText->append("\n\n正在为您定制专属方案...");
-            
-            // 清空输入框
-            inputField->clear();
-            
-            // 这里可以添加处理用户输入的逻辑
-            // 例如发送到AI进行处理等
-        }
-    });
+    connect(confirmBtn, &QPushButton::clicked, this, &CustomizePage::onConfirmButtonClicked);
     
     // 连接回车键提交功能
     connect(inputField, &QLineEdit::returnPressed, confirmBtn, &QPushButton::click);
@@ -141,4 +138,119 @@ void CustomizePage::setupUI()
     
     // 设置窗口样式
     setStyleSheet("background-color: white; border: 1px solid #ddd;");
+}
+
+void CustomizePage::onConfirmButtonClicked()
+{
+    QString userInput = inputField->text().trimmed();
+    if (userInput.isEmpty()) return;
+    
+    // 清空输入框
+    inputField->clear();
+    
+    // 禁用确定按钮，防止重复提交
+    confirmBtn->setEnabled(false);
+    
+    if (isFirstQuestion) {
+        // 第一次提问，保存原始问题
+        originalQuestion = userInput;
+        
+        // 显示正在处理的提示
+        instructionText->setText("正在为您定制专属方案，请稍候...");
+        
+        // 构建第一次请求的提示
+        QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                                "所以我希望你能向我提几个问题来收集解决这个问题所需的基本信息，"
+                                "来为我制定个性化的解决方案。你需要将问题一次性全部问出").arg(userInput);
+        
+        // 发送第一次请求
+        sendDeepseekRequest(prompt);
+        
+        // 更新状态为第二次提问
+        isFirstQuestion = false;
+    } else {
+        // 第二次提问，用户已提供基本信息
+        
+        // 显示正在处理的提示
+        instructionText->setText("正在根据您的信息生成个性化方案，请稍候...");
+        
+        // 构建第二次请求的提示
+        QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                                "以下是我的基本信息：%2。请你根据我的基本信息来为我制定一套个性化方案")
+                                .arg(originalQuestion, userInput);
+        
+        // 发送第二次请求
+        sendDeepseekRequest(prompt);
+        
+        // 重置状态为第一次提问（以便用户可以开始新的咨询）
+        isFirstQuestion = true;
+    }
+}
+
+void CustomizePage::sendDeepseekRequest(const QString &prompt)
+{
+    // 构建API请求
+    QJsonObject json{
+        {"model", "deepseek-chat"},
+        {"temperature", 0.7},
+        {"max_tokens", 2048},
+    };
+    
+    // 构建消息数组
+    QJsonArray messages = {
+        QJsonObject{
+            {"role", "system"}, 
+            {"content", "你是一个专业的问题解决顾问，擅长针对不同用户的需求提供个性化的解决方案。"}
+        },
+        QJsonObject{
+            {"role", "user"}, 
+            {"content", prompt}
+        }
+    };
+    
+    json["messages"] = messages;
+    
+    // 创建网络请求
+    QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+    
+    // 发送请求
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
+    
+    // 处理响应
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        // 重新启用确定按钮
+        confirmBtn->setEnabled(true);
+        
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (doc.isObject() && doc.object().contains("choices")) {
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
+                QJsonObject message = choice["message"].toObject();
+                if (message.contains("content")) {
+                    QString response = message["content"].toString();
+                    
+                    // 将API返回的内容显示在文本展示框中（覆盖原来的文字）
+                    instructionText->setText(response);
+                    
+                    // 如果是第一次提问的回答，更新输入框提示文本
+                    if (!isFirstQuestion) {
+                        inputField->setPlaceholderText("请在此输入您的基本信息...");
+                    } else {
+                        // 重置为初始状态
+                        inputField->setPlaceholderText("请在此输入您的问题...");
+                    }
+                } else {
+                    instructionText->setText("抱歉，无法获取有效的回复内容。请重试。");
+                }
+            } else {
+                instructionText->setText("抱歉，服务器返回的数据格式有误。请重试。");
+            }
+        } else {
+            instructionText->setText("抱歉，请求失败：" + reply->errorString() + "。请重试。");
+        }
+        
+        reply->deleteLater();
+    });
 }
