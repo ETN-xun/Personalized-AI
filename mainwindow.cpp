@@ -811,12 +811,17 @@ void MainWindow::createQuestionButtons() {
     QStringList newQuestions;
     QStringList selectedHobbies; // 临时数组存储选择的兴趣
     
-    // 定义一些角度和修饰词，增加问题的多样性
-    QStringList angles = {
-        "最新趋势", "入门建议", "高级技巧", "有趣事实", 
-        "历史发展", "未来展望", "常见误区", "专业术语",
-        "经典案例", "创新思路", "实用技巧", "奇闻轶事"
-    };
+    // 读取topics.json文件
+    QFile topicsFile(path + "/topics.json");
+    QJsonObject topicsData;
+    
+    if (topicsFile.open(QIODevice::ReadOnly)) {
+        QJsonDocument topicsDoc = QJsonDocument::fromJson(topicsFile.readAll());
+        if (topicsDoc.isObject()) {
+            topicsData = topicsDoc.object();
+        }
+        topicsFile.close();
+    }
     
     for (int i = 0; i < 3; i++) {
         QString selectedHobby;
@@ -846,76 +851,25 @@ void MainWindow::createQuestionButtons() {
             break;
         }
         
-        // 使用AI生成与所选兴趣相关的问题
+        // 从topics.json中获取与所选兴趣相关的问题
         if (!selectedHobby.isEmpty()) {
             selectedHobbies.append(selectedHobby); // 将选择的兴趣添加到临时数组
-            // 随机选择一个角度
-            QString angle = angles.at(QRandomGenerator::global()->bounded(angles.size()));
             
-            // 随机生成温度值，范围在0.7-1.0之间，增加多样性
-            double temperature = 0.7 + (QRandomGenerator::global()->generateDouble() * 0.3);
-            
-            // 添加时间戳和随机数，确保每次请求都不同
-            QString uniqueId = QString::number(QDateTime::currentMSecsSinceEpoch()) + 
-                               QString::number(QRandomGenerator::global()->generate());
-            
-            // 构建AI请求
-            QJsonObject json{
-                {"model", "deepseek-chat"},
-                {"temperature", temperature},
-                {"max_tokens", 100},
-            };
-            
-            // 改进系统提示词，强调多样性和创新性
-            QJsonArray messages = {
-                QJsonObject{{"role", "system"}, {"content", "你是一个创意问题生成器。请根据给定的兴趣爱好和角度，生成一个独特、有创意且引人思考的问题。问题必须是原创的，不要重复常见问题。直接输出问题，不要有任何前缀或解释。问题应该简洁有趣，字数在20字以内。每次生成的问题都应该与之前不同。"}},
-                QJsonObject{{"role", "user"}, {"content", "兴趣爱好：" + selectedHobby + "，角度：" + angle + "，唯一ID：" + uniqueId}}
-            };
-            
-            json["messages"] = messages;
-            
-            QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
-            request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-            request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8().data());
-            
-            // 同步请求（简化实现，实际应用中应考虑异步处理）
-            QNetworkAccessManager tempManager;
-            QNetworkReply *reply = tempManager.post(request, QJsonDocument(json).toJson());
-            
-            // 等待响应
-            QEventLoop loop;
-            connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
-            loop.exec();
-            
-            if (reply->error() == QNetworkReply::NoError) {
-                QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
-                QJsonObject responseObj = responseDoc.object();
-                if (responseObj.contains("choices") && responseObj["choices"].isArray()) {
-                    QJsonArray choices = responseObj["choices"].toArray();
-                    if (!choices.isEmpty() && choices[0].isObject()) {
-                        QJsonObject choice = choices[0].toObject();
-                        if (choice.contains("message") && choice["message"].isObject()) {
-                            QJsonObject message = choice["message"].toObject();
-                            if (message.contains("content")) {
-                                QString question = message["content"].toString().trimmed();
-                                newQuestions.append(question);
-                            }
-                        }
-                    }
+            if (topicsData.contains(selectedHobby) && topicsData[selectedHobby].isArray()) {
+                QJsonArray hobbyTopics = topicsData[selectedHobby].toArray();
+                if (!hobbyTopics.isEmpty()) {
+                    // 随机选择一个问题
+                    int randomTopicIndex = QRandomGenerator::global()->bounded(hobbyTopics.size());
+                    QString question = hobbyTopics[randomTopicIndex].toString();
+                    newQuestions.append(question);
+                } else {
+                    // 如果该兴趣没有问题，使用默认问题
+                    newQuestions.append("你对" + selectedHobby + "有什么看法？");
                 }
             } else {
-                // 如果AI请求失败，使用默认问题格式，但添加随机元素
-                QStringList defaultFormats = {
-                    "关于" + selectedHobby + "的" + angle + "是什么？",
-                    selectedHobby + "中有哪些" + angle + "？",
-                    "你对" + selectedHobby + "的" + angle + "有何看法？",
-                    selectedHobby + "领域最新的" + angle + "是什么？"
-                };
-                int randomIndex = QRandomGenerator::global()->bounded(defaultFormats.size());
-                newQuestions.append(defaultFormats.at(randomIndex));
+                // 如果在topics.json中找不到该兴趣，使用默认问题
+                newQuestions.append("你对" + selectedHobby + "有什么看法？");
             }
-            
-            reply->deleteLater();
         }
     }
     
@@ -956,10 +910,11 @@ void MainWindow::createQuestionButtons() {
             }
         )");
         
-        // 设置按钮位置 - 修改为左上角垂直排列
+        // 设置按钮位置 - 修改为中央区域左上角垂直排列
         int btnHeight = 50;
         int spacing = 20;
-        int startX = 20; // 左边距
+        // 考虑侧边栏宽度，将按钮放在中央区域左上方
+        int startX = sideBar->width() + 20; // 从侧边栏右侧开始，加上一些左边距
         int startY = titleBar->height() + 20; // 从标题栏下方开始，加上一些上边距
         
         // 根据文本长度计算按钮宽度
@@ -1270,8 +1225,84 @@ void PieChartWidget::paintEvent(QPaintEvent *) {
 }
 void MainWindow::openCustomizePage()
 {
-    CustomizePage *page = new CustomizePage();
-    page->show();
+    // 创建新会话
+    createNewChat();
+    
+    // 设置标志，表示用户已经提过问题
+    hasAskedQuestion = true;
+    
+    // 隐藏所有问题按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
+        }
+    }
+    buttonsShown = true;
+    
+    // 构建用户基本信息
+    QString userInfo = "用户性别：" + userGender + "\n兴趣爱好：";
+    
+    // 读取hobbies.json文件获取用户兴趣爱好
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(path + "/hobbies.json");
+    QStringList selectedHobbies;
+    
+    if (file.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &value : array) {
+                QJsonObject obj = value.toObject();
+                if (obj["weight"].toInt() > 0) {
+                    selectedHobbies.append(obj["name"].toString());
+                }
+            }
+        }
+        file.close();
+    }
+    
+    userInfo += selectedHobbies.join("、");
+    
+    // 构建系统提示信息
+    QString systemPrompt = "你是一个个性化AI助手，请根据以下用户信息，为用户提供个性化的帮助和建议：\n\n" + userInfo;
+    
+    // 添加系统消息到聊天窗口
+    ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>系统: 已进入量身定制模式，AI将根据您的个人信息提供更加个性化的回答</div>");
+    ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>用户信息: " + userInfo.replace("\n", "<br>") + "</div>");
+    ui->textEditChat->append("<br>");
+    
+    // 添加引导性问题
+    QString welcomeMessage = "请问有什么我可以帮助您的吗？您可以直接提问，或者告诉我您当前面临的问题或需求。";
+    ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
+    ui->textEditChat->append("<div style='margin-left:10px;'>" + welcomeMessage + "</div>");
+    ui->textEditChat->append("<br>");
+    
+    // 记录系统消息到当前会话
+    QJsonObject systemMessage;
+    systemMessage["role"] = "system";
+    systemMessage["content"] = systemPrompt;
+    
+    QJsonObject aiMessage;
+    aiMessage["role"] = "assistant";
+    aiMessage["content"] = welcomeMessage;
+    
+    // 查找当前会话并添加消息
+    for (int i = 0; i < chatHistories.size(); i++) {
+        if (chatHistories[i]["id"].toString() == currentChatId) {
+            QJsonArray messages = chatHistories[i]["messages"].toArray();
+            messages.append(systemMessage);
+            messages.append(aiMessage);
+            chatHistories[i]["messages"] = messages;
+            
+            // 更新会话标题
+            chatHistories[i]["title"] = "量身定制会话";
+            chatHistoryList->item(i)->setText("量身定制会话");
+            break;
+        }
+    }
+    
+    // 保存聊天历史
+    saveChatHistory();
 }
 
 // 新增：创建新会话
