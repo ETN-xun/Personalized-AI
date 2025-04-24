@@ -13,6 +13,9 @@
 #include <QWindow>
 #include <QtGui/qwindowdefs.h>
 #include <QPainter>
+#include <QListWidget> // 添加列表控件头文件
+#include <QJsonArray> // 添加JSON数组头文件
+#include <QJsonObject> // 添加JSON对象头文件
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -53,6 +56,8 @@ private slots:
     void toggleMaximize();
     void onQuestionButtonClicked(); // 新增：问题按钮点击处理
     void openCustomizePage();
+    void createNewChat(); // 新增：创建新会话
+    void loadChatHistory(int index); // 新增：加载历史会话
 
 private:
     QPushButton *customizeBtn;
@@ -60,6 +65,8 @@ private:
     int getMouseRegion(const QPoint &pos) const;
     void updateCursorShape(const QPoint &pos);
     void createQuestionButtons(); // 新增：创建问题按钮
+    void saveChatHistory(); // 新增：保存聊天历史
+    void loadChatHistories(); // 新增：加载所有聊天历史
 
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
@@ -96,6 +103,13 @@ private:
 
     // 新增函数声明
     void sendChatRequest(const QString &question, bool isOptimization);
+    
+    // 新增：侧边栏和会话历史相关
+    QWidget *sideBar;
+    QListWidget *chatHistoryList;
+    QPushButton *newChatBtn;
+    QString currentChatId;
+    QList<QJsonObject> chatHistories;
 };
 
 

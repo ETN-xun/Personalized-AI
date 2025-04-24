@@ -15,6 +15,9 @@
 #include <QFile>
 #include <QRandomGenerator>
 #include <QEventLoop>
+#include <QDir>
+#include <QDateTime>
+#include <QListWidget>
 #include "customizepage.h"
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -37,7 +40,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_scale(1.0),
     buttonsShown(false),
     hasAskedQuestion(false),
-    customizeBtn(nullptr) // 添加量身定制按钮指针
+    customizeBtn(nullptr), // 添加量身定制按钮指针
+    sideBar(nullptr),
+    newChatBtn(nullptr),
+    chatHistoryList(nullptr),
+    currentChatId("")
 {
     // 调整初始化顺序以匹配.h中的成员变量声明顺序
     ui->setupUi(this);
@@ -236,6 +243,83 @@ MainWindow::MainWindow(QWidget *parent)
     
     // 设置窗口标题
     titleLabel->setText("个性化AI助手");
+    
+    // 创建侧边栏
+    sideBar = new QWidget(this);
+    sideBar->setFixedWidth(200);
+    sideBar->setStyleSheet("background-color: #f0f0f0; border-right: 1px solid #ddd;");
+    
+    QVBoxLayout *sideBarLayout = new QVBoxLayout(sideBar);
+    sideBarLayout->setContentsMargins(10, 10, 10, 10);
+    sideBarLayout->setSpacing(10);
+    
+    // 创建新会话按钮
+    newChatBtn = new QPushButton("新会话", sideBar);
+    newChatBtn->setStyleSheet(R"(
+        QPushButton {
+            background-color: #4A90E2;
+            color: white;
+            border-radius: 5px;
+            padding: 8px;
+            font-size: 14px;
+        }
+        QPushButton:hover {
+            background-color: #63B8FF;
+        }
+        QPushButton:pressed {
+            background-color: #3A7BFF;
+        }
+    )");
+    connect(newChatBtn, &QPushButton::clicked, this, &MainWindow::createNewChat);
+    
+    // 创建会话历史列表
+    chatHistoryList = new QListWidget(sideBar);
+    chatHistoryList->setStyleSheet(R"(
+        QListWidget {
+            background-color: #f8f8f8;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        QListWidget::item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        QListWidget::item:selected {
+            background-color: #e0e0e0;
+            color: #333;
+        }
+        QListWidget::item:hover {
+            background-color: #f0f0f0;
+        }
+    )");
+    connect(chatHistoryList, &QListWidget::currentRowChanged, this, &MainWindow::loadChatHistory);
+    
+    sideBarLayout->addWidget(newChatBtn);
+    sideBarLayout->addWidget(chatHistoryList);
+    
+    // 调整主窗口布局以适应侧边栏
+    QHBoxLayout *sidebarLayout = new QHBoxLayout();
+    sidebarLayout->setContentsMargins(0, 0, 0, 0);
+    sidebarLayout->setSpacing(0);
+    
+    sidebarLayout->addWidget(sideBar);
+    
+    // 创建中央内容区域容器
+    QWidget *contentWidget = new QWidget();
+    contentWidget->setLayout(ui->centralwidget->layout());
+    ui->centralwidget->setLayout(nullptr);
+    
+    sidebarLayout->addWidget(contentWidget);
+    
+    QWidget *container = new QWidget();
+    container->setLayout(sidebarLayout);
+    setCentralWidget(container);
+    
+    // 加载聊天历史
+    loadChatHistories();
+    
+    // 创建新会话
+    createNewChat();
 }
 
 MainWindow::~MainWindow() {
@@ -251,6 +335,9 @@ MainWindow::~MainWindow() {
     delete loadIndicator;
     delete portraitBtn; // 释放画像按钮
     delete portraitWindow; // 释放画像窗口
+    delete sideBar;
+    delete newChatBtn;
+    delete chatHistoryList;
     
     // 清理问题按钮
     for (QPushButton* btn : questionButtons) {
@@ -317,9 +404,9 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
 }
 
 void MainWindow::on_pushButtonSend_clicked() {
-    QString input = ui->lineEditInput->text().trimmed();
-    if (input.isEmpty()) return;
-
+    QString message = ui->lineEditInput->text().trimmed();
+    if (message.isEmpty()) return;
+    
     // 设置加载状态
     isLoading = true;
     rotationAnimation->start();
@@ -337,18 +424,38 @@ void MainWindow::on_pushButtonSend_clicked() {
 
     // 清空输入框并添加用户消息到聊天窗口
     ui->lineEditInput->clear();
-    ui->textEditChat->append("<div style='color:#4A90E2; font-weight:bold;'>你:</div>");
-    ui->textEditChat->append("<div style='margin-left:10px;'>" + input + "</div>");
-    ui->textEditChat->append("<br>");
+    ui->textEditChat->append("<div style='text-align:right;'><span style='background-color:#DCF8C6;padding:5px;border-radius:5px;'>" + message + "</span></div>");
+    
+    // 记录用户消息到当前会话
+    QJsonObject chatMessage;
+    chatMessage["role"] = "user";
+    chatMessage["content"] = message;
+    
+    // 查找当前会话
+    for (int i = 0; i < chatHistories.size(); i++) {
+        if (chatHistories[i]["id"].toString() == currentChatId) {
+            QJsonArray messages = chatHistories[i]["messages"].toArray();
+            messages.append(chatMessage);
+            chatHistories[i]["messages"] = messages;
+            
+            // 更新会话标题（使用用户的第一条消息作为标题）
+            if (messages.size() == 1) {
+                QString title = message;
+                if (title.length() > 20) {
+                    title = title.left(20) + "...";
+                }
+                chatHistories[i]["title"] = title;
+                chatHistoryList->item(i)->setText(title);
+            }
+            break;
+        }
+    }
+    
+    // 保存聊天历史
+    saveChatHistory();
 
     // 发送聊天请求
-    sendChatRequest(input, false);
-    // 停止加载动画
-    /*
-    isLoading = false;
-    rotationAnimation->stop();
-    loadIndicator->clear();
-    */
+    sendChatRequest(message, false);
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
@@ -388,14 +495,46 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
         setRotationAngle(0.0);
 
         if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            if (doc.isObject() && doc.object().contains("choices")) {
-                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
-                QJsonObject message = choice["message"].toObject();
-                if (message.contains("content")) {
-                    ui->textEditChat->append(tr("Bot: %1").arg(message["content"].toString()));
+            QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
+            QJsonObject responseObj = responseDoc.object();
+            
+            if (responseObj.contains("choices") && responseObj["choices"].isArray()) {
+                QJsonArray choices = responseObj["choices"].toArray();
+                if (!choices.isEmpty() && choices[0].isObject()) {
+                    QJsonObject choice = choices[0].toObject();
+                    if (choice.contains("message") && choice["message"].isObject()) {
+                        QJsonObject message = choice["message"].toObject();
+                        if (message.contains("content")) {
+                            QString content = message["content"].toString();
+                            
+                            // 添加AI回复到聊天窗口
+                            ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + content + "</span></div>");
+                            
+                            // 记录AI回复到当前会话
+                            QJsonObject chatMessage;
+                            chatMessage["role"] = "assistant";
+                            chatMessage["content"] = content;
+                            
+                            // 查找当前会话
+                            for (int i = 0; i < chatHistories.size(); i++) {
+                                if (chatHistories[i]["id"].toString() == currentChatId) {
+                                    QJsonArray messages = chatHistories[i]["messages"].toArray();
+                                    messages.append(chatMessage);
+                                    chatHistories[i]["messages"] = messages;
+                                    break;
+                                }
+                            }
+                            
+                            // 保存聊天历史
+                            saveChatHistory();
+                        } else {
+                            ui->textEditChat->append(tr("无效响应：未找到内容字段"));
+                        }
+                    } else {
+                        ui->textEditChat->append(tr("无效响应：未找到消息对象"));
+                    }
                 } else {
-                    ui->textEditChat->append(tr("无效响应：未找到内容字段"));
+                    ui->textEditChat->append(tr("无效响应：choices数组为空"));
                 }
             } else {
                 ui->textEditChat->append(tr("无效响应：缺少choices数组"));
@@ -414,13 +553,6 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
             btn->hide();
         }
     }
-    
-    // 停止加载动画
-    /*
-    isLoading = false;
-    rotationAnimation->stop();
-    loadIndicator->clear();
-    */
 
     reply->deleteLater();
     update();
@@ -433,7 +565,7 @@ void MainWindow::showEvent(QShowEvent *event) {
     if (!screen) return;
 
     QRect screenRect = screen->availableGeometry();
-    QSize initSize(600, 400);
+    QSize initSize(800, 600); // 增加初始窗口大小以适应侧边栏
 
     m_sizeAnimation->setStartValue(QRect(
         (screenRect.width() - initSize.width()) / 2,
@@ -1141,6 +1273,124 @@ void MainWindow::openCustomizePage()
     CustomizePage *page = new CustomizePage();
     page->show();
 }
+
+// 新增：创建新会话
+void MainWindow::createNewChat()
+{
+    // 清空聊天窗口
+    ui->textEditChat->clear();
+    
+    // 生成唯一ID
+    currentChatId = QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
+    
+    // 创建新会话对象
+    QJsonObject chatHistory;
+    chatHistory["id"] = currentChatId;
+    chatHistory["title"] = "新会话";
+    chatHistory["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    chatHistory["messages"] = QJsonArray();
+    
+    // 添加到会话列表
+    chatHistories.prepend(chatHistory);
+    
+    // 更新UI
+    chatHistoryList->insertItem(0, "新会话");
+    chatHistoryList->setCurrentRow(0);
+    
+    // 保存聊天历史
+    saveChatHistory();
+    
+    // 重置问题状态
+    hasAskedQuestion = false;
+    
+    // 创建问题按钮
+    createQuestionButtons();
+}
+
+// 新增：加载历史会话
+void MainWindow::loadChatHistory(int index)
+{
+    if (index < 0 || index >= chatHistories.size()) return;
+    
+    // 获取选中的会话
+    QJsonObject chatHistory = chatHistories[index];
+    currentChatId = chatHistory["id"].toString();
+    
+    // 清空聊天窗口
+    ui->textEditChat->clear();
+    
+    // 加载会话消息
+    QJsonArray messages = chatHistory["messages"].toArray();
+    for (const QJsonValue &value : messages) {
+        QJsonObject message = value.toObject();
+        QString role = message["role"].toString();
+        QString content = message["content"].toString();
+        
+        if (role == "user") {
+            ui->textEditChat->append("<div style='text-align:right;'><span style='background-color:#DCF8C6;padding:5px;border-radius:5px;'>" + content + "</span></div>");
+        } else if (role == "assistant") {
+            ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + content + "</span></div>");
+        }
+    }
+    
+    // 设置hasAskedQuestion为true，表示这是一个已有的会话
+    hasAskedQuestion = !messages.isEmpty();
+    
+    // 隐藏问题按钮
+    for (QPushButton* btn : questionButtons) {
+        if (btn) {
+            btn->hide();
+        }
+    }
+}
+
+// 新增：保存聊天历史
+void MainWindow::saveChatHistory()
+{
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir dir(path);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    
+    QFile file(path + "/chat_history.json");
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        // 将QList<QJsonObject>转换为QJsonArray
+        QJsonArray jsonArray;
+        for (const QJsonObject &obj : chatHistories) {
+            jsonArray.append(obj);
+        }
+        
+        QJsonDocument doc(jsonArray);
+        file.write(doc.toJson());
+        file.close();
+    }
+}
+
+// 新增：加载所有聊天历史
+void MainWindow::loadChatHistories()
+{
+    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QFile file(path + "/chat_history.json");
+    
+    if (file.exists() && file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        if (doc.isArray()) {
+            QJsonArray array = doc.array();
+            for (const QJsonValue &value : array) {
+                chatHistories.append(value.toObject());
+            }
+        }
+        file.close();
+    }
+    
+    // 更新UI
+    chatHistoryList->clear();
+    for (const QJsonObject &chatHistory : chatHistories) {
+        chatHistoryList->addItem(chatHistory["title"].toString());
+    }
+}
+
 void PieChartWidget::setHobbiesWithWeights(const QList<QPair<QString, int>> &hobbies) {
     m_hobbiesWithWeights = hobbies;
     update(); // 触发重绘
