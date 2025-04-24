@@ -18,6 +18,7 @@ public:
 
 private slots:
     void onConfirmButtonClicked();
+    void onGenerateScheduleClicked(); // 添加新的槽函数
 
 private:
     void setupUI();
@@ -29,11 +30,13 @@ private:
     QTextEdit *instructionText;
     QLineEdit *inputField;
     QPushButton *confirmBtn;
+    QPushButton *generateScheduleBtn; // 添加计划表按钮
     
     QNetworkAccessManager *networkManager;
     QString apiKey;
     
-    // 添加状态变量和存储原始问题的变量
     bool isFirstQuestion;
     QString originalQuestion;
+    QString userInfo; // 添加存储用户基本信息的变量
+    bool hasGeneratedSolution; // 添加标记是否已生成解决方案
 };
