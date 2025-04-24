@@ -432,14 +432,34 @@ void MainWindow::on_pushButtonSend_clicked() {
     chatMessage["content"] = message;
     
     // 查找当前会话
+    bool isCustomizeSession = false;
+    QString userInfo;
+    QString originalQuestion = message; // 保存原始问题
+    
     for (int i = 0; i < chatHistories.size(); i++) {
         if (chatHistories[i]["id"].toString() == currentChatId) {
             QJsonArray messages = chatHistories[i]["messages"].toArray();
             messages.append(chatMessage);
             chatHistories[i]["messages"] = messages;
             
+            // 检查是否是量身定制会话
+            if (chatHistories[i]["title"].toString() == "量身定制会话") {
+                isCustomizeSession = true;
+                
+                // 如果是第一个用户问题，保存为原始问题
+                if (messages.size() == 3) { // 系统消息、AI欢迎消息、用户第一个问题
+                    chatHistories[i]["originalQuestion"] = message;
+                    userInfo = chatHistories[i]["userInfo"].toString();
+                }
+                else {
+                    // 如果已经有原始问题，获取它
+                    originalQuestion = chatHistories[i]["originalQuestion"].toString();
+                    userInfo = chatHistories[i]["userInfo"].toString();
+                }
+            }
+            
             // 更新会话标题（使用用户的第一条消息作为标题）
-            if (messages.size() == 1) {
+            if (messages.size() == 1 && !isCustomizeSession) {
                 QString title = message;
                 if (title.length() > 20) {
                     title = title.left(20) + "...";
@@ -455,15 +475,74 @@ void MainWindow::on_pushButtonSend_clicked() {
     saveChatHistory();
 
     // 发送聊天请求
-    sendChatRequest(message, false);
+    if (isCustomizeSession) {
+        // 使用量身定制的特殊提示格式
+        QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                               "以下是我的基本信息：%2。请你根据我的基本信息来为我制定一张计划表，"
+                               "表上的内容是我为了解决我的问题每日需要完成的任务")
+                               .arg(originalQuestion, userInfo);
+        
+        sendCustomizedChatRequest(prompt);
+    } else {
+        sendChatRequest(message, false);
+    }
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
+    // 检查请求类型
+    QString requestType = reply->property("requestType").toString();
+    
+    // 处理量身定制响应
+    if (requestType == "customized") {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (doc.isObject() && doc.object().contains("choices")) {
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
+                QJsonObject message = choice["message"].toObject();
+                if (message.contains("content")) {
+                    QString response = message["content"].toString();
+                    
+                    // 添加AI回复到聊天窗口
+                    ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
+                    ui->textEditChat->append("<div style='margin-left:10px;'>" + response + "</span></div>");
+                    ui->textEditChat->append("<br>");
+                    
+                    // 记录AI回复到当前会话
+                    QJsonObject aiMessage;
+                    aiMessage["role"] = "assistant";
+                    aiMessage["content"] = response;
+                    
+                    for (int i = 0; i < chatHistories.size(); i++) {
+                        if (chatHistories[i]["id"].toString() == currentChatId) {
+                            QJsonArray messages = chatHistories[i]["messages"].toArray();
+                            messages.append(aiMessage);
+                            chatHistories[i]["messages"] = messages;
+                            break;
+                        }
+                    }
+                    
+                    // 保存聊天历史
+                    saveChatHistory();
+                }
+            }
+        } else {
+            // 处理错误
+            ui->textEditChat->append("<div style='color:red;'>请求失败：" + reply->errorString() + "</div>");
+        }
+        
+        // 停止加载动画
+        isLoading = false;
+        rotationAnimation->stop();
+        loadIndicator->clear();
+        reply->deleteLater();
+        return; // 提前返回，不执行后面的代码
+    }
+
+    // 处理优化请求回复
     bool isOptimization = reply->property("requestType").toString() == "optimization";
     QString originalInput = reply->property("originalInput").toString();
-
+    
     if (isOptimization) {
-        // 处理优化请求回复
         if (reply->error() == QNetworkReply::NoError) {
             QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
             if (doc.isObject() && doc.object().contains("choices")) {
@@ -471,19 +550,14 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                 QJsonObject message = choice["message"].toObject();
                 if (message.contains("content")) {
                     QString optimizedQuestion = message["content"].toString();
-                    // 发送优化后的问题
                     sendChatRequest(optimizedQuestion, false);
-                    //ui->textEditChat->append(tr("优化后的问题: %1").arg(optimizedQuestion));
                 } else {
-                    // 优化失败则直接发送原问题
                     sendChatRequest(originalInput, false);
                 }
             } else {
-                // 结构解析失败则发送原问题
                 sendChatRequest(originalInput, false);
             }
         } else {
-            // 网络错误处理
             ui->textEditChat->append(tr("优化请求失败，错误代码：%1").arg(reply->error()));
             sendChatRequest(originalInput, false);
         }
@@ -507,15 +581,12 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                         if (message.contains("content")) {
                             QString content = message["content"].toString();
                             
-                            // 添加AI回复到聊天窗口
                             ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + content + "</span></div>");
                             
-                            // 记录AI回复到当前会话
                             QJsonObject chatMessage;
                             chatMessage["role"] = "assistant";
                             chatMessage["content"] = content;
                             
-                            // 查找当前会话
                             for (int i = 0; i < chatHistories.size(); i++) {
                                 if (chatHistories[i]["id"].toString() == currentChatId) {
                                     QJsonArray messages = chatHistories[i]["messages"].toArray();
@@ -524,8 +595,6 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                                     break;
                                 }
                             }
-                            
-                            // 保存聊天历史
                             saveChatHistory();
                         } else {
                             ui->textEditChat->append(tr("无效响应：未找到内容字段"));
@@ -544,10 +613,8 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
         }
     }
 
-    // 在函数的最后，确保设置hasAskedQuestion为true
     hasAskedQuestion = true;
     
-    // 隐藏所有问题按钮
     for (QPushButton* btn : questionButtons) {
         if (btn) {
             btn->hide();
@@ -1263,16 +1330,11 @@ void MainWindow::openCustomizePage()
     
     userInfo += selectedHobbies.join("、");
     
-    // 构建系统提示信息
-    QString systemPrompt = "你是一个个性化AI助手，请根据以下用户信息，为用户提供个性化的帮助和建议：\n\n" + userInfo;
-    
-    // 添加系统消息到聊天窗口
+    // 添加引导性问题，提示用户输入问题
+    QString welcomeMessage = "请输入您当前面临的问题，我将根据您的个人信息为您提供个性化的解决方案和计划表。";
     ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>系统: 已进入量身定制模式，AI将根据您的个人信息提供更加个性化的回答</div>");
     ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>用户信息: " + userInfo.replace("\n", "<br>") + "</div>");
     ui->textEditChat->append("<br>");
-    
-    // 添加引导性问题
-    QString welcomeMessage = "请问有什么我可以帮助您的吗？您可以直接提问，或者告诉我您当前面临的问题或需求。";
     ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
     ui->textEditChat->append("<div style='margin-left:10px;'>" + welcomeMessage + "</div>");
     ui->textEditChat->append("<br>");
@@ -1280,7 +1342,7 @@ void MainWindow::openCustomizePage()
     // 记录系统消息到当前会话
     QJsonObject systemMessage;
     systemMessage["role"] = "system";
-    systemMessage["content"] = systemPrompt;
+    systemMessage["content"] = "你是一个专业的问题解决顾问，擅长针对不同用户的需求提供个性化的解决方案和计划表。请根据以下用户信息，为用户提供个性化的帮助和建议：\n\n" + userInfo;
     
     QJsonObject aiMessage;
     aiMessage["role"] = "assistant";
@@ -1297,6 +1359,9 @@ void MainWindow::openCustomizePage()
             // 更新会话标题
             chatHistories[i]["title"] = "量身定制会话";
             chatHistoryList->item(i)->setText("量身定制会话");
+            
+            // 存储用户信息，用于后续请求
+            chatHistories[i]["userInfo"] = userInfo;
             break;
         }
     }
@@ -1425,4 +1490,41 @@ void MainWindow::loadChatHistories()
 void PieChartWidget::setHobbiesWithWeights(const QList<QPair<QString, int>> &hobbies) {
     m_hobbiesWithWeights = hobbies;
     update(); // 触发重绘
+}
+void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
+    // 设置加载状态
+    isLoading = true;
+    rotationAnimation->start();
+    
+    // 构建API请求
+    QJsonObject json{
+        {"model", "deepseek-chat"},
+        {"temperature", 0.7},
+        {"max_tokens", 2048},
+    };
+    
+    // 构建消息数组
+    QJsonArray messages = {
+        QJsonObject{
+            {"role", "system"}, 
+            {"content", "你是一个专业的问题解决顾问，擅长针对不同用户的需求提供个性化的解决方案和计划表。"}
+        },
+        QJsonObject{
+            {"role", "user"}, 
+            {"content", prompt}
+        }
+    };
+    
+    json["messages"] = messages;
+    
+    // 创建网络请求
+    QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+    
+    // 发送请求
+    QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
+    
+    // 设置请求类型属性，以便在回调中区分
+    reply->setProperty("requestType", "customized");
 }

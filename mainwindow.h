@@ -67,6 +67,7 @@ private:
     void createQuestionButtons(); // 新增：创建问题按钮
     void saveChatHistory(); // 新增：保存聊天历史
     void loadChatHistories(); // 新增：加载所有聊天历史
+    void sendCustomizedChatRequest(const QString &prompt);
 
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
