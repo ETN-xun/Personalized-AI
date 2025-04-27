@@ -707,9 +707,14 @@ void MainWindow::toggleMaximize() {
         animation->setEndValue(normalGeom);
         animation->setEasingCurve(QEasingCurve::OutCubic); // 使用平滑的缓动曲线
         
+        // 修改连接方式，确保窗口状态正确更新
         connect(animation, &QPropertyAnimation::finished, this, [this]() {
             showNormal();
+            setGeometry(QStyle::alignedRect(Qt::LeftToRight, Qt::AlignCenter, 
+                QSize(800, 600), screen()->availableGeometry()));
             maxBtn->setText("□");
+            // 确保窗口状态同步更新
+            QCoreApplication::processEvents();
         });
         
         animation->start(QAbstractAnimation::DeleteWhenStopped);
@@ -728,9 +733,12 @@ void MainWindow::toggleMaximize() {
         animation->setEndValue(maxGeom);
         animation->setEasingCurve(QEasingCurve::OutCubic); // 使用平滑的缓动曲线
         
+        // 修改连接方式，确保状态正确更新
         connect(animation, &QPropertyAnimation::finished, this, [this]() {
             showMaximized();
             maxBtn->setText("❐");
+            // 强制刷新窗口状态
+            resize(width(), height());
         });
         
         animation->start(QAbstractAnimation::DeleteWhenStopped);
@@ -1480,7 +1488,8 @@ void MainWindow::createNewChat()
     // 创建新会话对象
     QJsonObject chatHistory;
     chatHistory["id"] = chatId;
-    chatHistory["title"] = "新会话";
+    bool isCustomize = QObject::sender() == customizeBtn; // 判断触发源是否是量身定制按钮
+    chatHistory["title"] = isCustomize ? "量身定制会话" : "新会话";
     chatHistory["messages"] = QJsonArray();
     
     // 添加到会话列表
@@ -1488,6 +1497,7 @@ void MainWindow::createNewChat()
     
     // 更新UI
     QListWidgetItem* item = new QListWidgetItem();
+
     
     // 创建一个包含会话标题和删除按钮的小部件
     QWidget* itemWidget = new QWidget();
@@ -1496,7 +1506,8 @@ void MainWindow::createNewChat()
     layout->setSpacing(5);
     
     // 会话标题标签
-    QLabel* titleLabel = new QLabel("新会话", itemWidget);
+    QLabel* titleLabel = new QLabel(isCustomize ? "量身定制会话" : "新会话", itemWidget);
+    //QLabel* titleLabel = new QLabel("新会话", itemWidget);
     titleLabel->setStyleSheet("background: transparent;");
     
     // 删除按钮
