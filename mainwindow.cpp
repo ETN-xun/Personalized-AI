@@ -1492,7 +1492,7 @@ void MainWindow::createNewChat()
     // 创建一个包含会话标题和删除按钮的小部件
     QWidget* itemWidget = new QWidget();
     QHBoxLayout* layout = new QHBoxLayout(itemWidget);
-    layout->setContentsMargins(5, 2, 5, 2);
+    layout->setContentsMargins(8, 5, 8, 5);
     layout->setSpacing(5);
     
     // 会话标题标签
@@ -1553,7 +1553,7 @@ void MainWindow::createNewChat()
     itemWidget->setLayout(layout);
     
     // 设置列表项
-    item->setSizeHint(QSize(chatHistoryList->width() - 10, 30));
+    item->setSizeHint(QSize(chatHistoryList->width() - 10, 40));
     chatHistoryList->insertItem(0, item);
     chatHistoryList->setItemWidget(item, itemWidget);
     chatHistoryList->setCurrentRow(0);
@@ -1654,7 +1654,7 @@ void MainWindow::loadChatHistories()
         // 创建一个包含会话标题和删除按钮的小部件
         QWidget* itemWidget = new QWidget(chatHistoryList);
         QHBoxLayout* layout = new QHBoxLayout(itemWidget);
-        layout->setContentsMargins(5, 2, 5, 2);
+        layout->setContentsMargins(8, 5, 8, 5);
         layout->setSpacing(5);
         
         // 会话标题标签
@@ -1718,7 +1718,7 @@ void MainWindow::loadChatHistories()
         // 创建列表项并设置自定义小部件
         QListWidgetItem* item = new QListWidgetItem(chatHistoryList);
         // 设置合适的高度，确保整个内容可见
-        item->setSizeHint(QSize(chatHistoryList->width() - 10, 30));
+        item->setSizeHint(QSize(chatHistoryList->width() - 10, 40));
         chatHistoryList->setItemWidget(item, itemWidget);
     }
 }
