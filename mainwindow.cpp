@@ -155,33 +155,26 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:pressed { background: #3A7BFF; }
     )");
     
-    // 添加"量身定制"按钮
+    // 修改"量身定制"按钮位置
     customizeBtn = new QPushButton("量身定制", this);
-    customizeBtn->setFixedSize(75, 30); // 比发送按钮小一半
+    customizeBtn->setFixedSize(100, 35);
     customizeBtn->setStyleSheet(R"(
         QPushButton {
             background: #4A90E2;
             color: white;
             border-radius: 10px;
-            font-size: 12px;
+            font-size: 14px;
         }
         QPushButton:hover { background: #63B8FF; }
         QPushButton:pressed { background: #3A7BFF; }
     )");
 
-    // 将按钮添加到布局中
-    QVBoxLayout *sendBtnLayout = new QVBoxLayout();
-    sendBtnLayout->setSpacing(5);
-    sendBtnLayout->addWidget(customizeBtn, 0, Qt::AlignCenter);
-    sendBtnLayout->addWidget(ui->pushButtonSend);
-
-    // 替换原来的发送按钮
-    QHBoxLayout *inputLayout = qobject_cast<QHBoxLayout*>(ui->horizontalLayout);
-    if (inputLayout) {
-        // 移除原来的发送按钮
-        inputLayout->removeWidget(ui->pushButtonSend);
-        // 添加新的布局（包含量身定制按钮和发送按钮）
-        inputLayout->addLayout(sendBtnLayout);
+    // 将量身定制按钮添加到标题栏
+    if (titleBar->layout()) {
+        // 在最小化按钮之前添加量身定制按钮
+        int minBtnIndex = titleLayout->indexOf(minBtn);
+        titleLayout->insertWidget(minBtnIndex, customizeBtn);
+        titleLayout->insertSpacing(minBtnIndex + 1, 10); // 添加一些间距
     }
 
     // 连接量身定制按钮的点击信号
@@ -706,13 +699,42 @@ void MainWindow::showEvent(QShowEvent *event) {
 
 void MainWindow::toggleMaximize() {
     if (isMaximized()) {
-        showNormal();
-        maxBtn->setText("□"); // 恢复为方框
+        // 创建动画效果
+        QRect normalGeom = normalGeometry();
+        QPropertyAnimation *animation = new QPropertyAnimation(this, "geometry");
+        animation->setDuration(300); // 300毫秒的动画
+        animation->setStartValue(geometry());
+        animation->setEndValue(normalGeom);
+        animation->setEasingCurve(QEasingCurve::OutCubic); // 使用平滑的缓动曲线
+        
+        connect(animation, &QPropertyAnimation::finished, this, [this]() {
+            showNormal();
+            maxBtn->setText("□");
+        });
+        
+        animation->start(QAbstractAnimation::DeleteWhenStopped);
     } else {
-        showMaximized();
-        maxBtn->setText("▢"); // 最大化时显示实心方框
+        // 保存当前几何信息
+        QRect startGeom = geometry();
+        
+        // 获取最大化后的几何信息
+        QScreen *screen = windowHandle()->screen();
+        QRect maxGeom = screen->availableGeometry();
+        
+        // 创建动画效果
+        QPropertyAnimation *animation = new QPropertyAnimation(this, "geometry");
+        animation->setDuration(300); // 300毫秒的动画
+        animation->setStartValue(startGeom);
+        animation->setEndValue(maxGeom);
+        animation->setEasingCurve(QEasingCurve::OutCubic); // 使用平滑的缓动曲线
+        
+        connect(animation, &QPropertyAnimation::finished, this, [this]() {
+            showMaximized();
+            maxBtn->setText("❐");
+        });
+        
+        animation->start(QAbstractAnimation::DeleteWhenStopped);
     }
-    setWindowTitle(tr("智能聊天 - 用户性别：%1").arg(userGender));
 }
 
 void MainWindow::setUserGender(const QString &gender) {
@@ -724,19 +746,22 @@ void MainWindow::setUserGender(const QString &gender) {
 void MainWindow::paintEvent(QPaintEvent *event) {
     QMainWindow::paintEvent(event);
 
-    int corner_padding = static_cast<int>(20 * m_scale);
-    QPointF points[3];
-    points[0] = QPointF(width(), height());
-    points[1] = QPointF(width() - corner_padding, height());
-    points[2] = QPointF(width(), height() - corner_padding);
+    // 只在非最大化状态下绘制调整大小的三角形
+    if (!isMaximized()) {
+        int corner_padding = static_cast<int>(20 * m_scale);
+        QPointF points[3];
+        points[0] = QPointF(width(), height());
+        points[1] = QPointF(width() - corner_padding, height());
+        points[2] = QPointF(width(), height() - corner_padding);
 
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    QColor handleColor("#4A90E2");
-    handleColor.setAlpha(150);
-    painter.setBrush(handleColor);
-    painter.setPen(Qt::NoPen);
-    painter.drawPolygon(points, 3);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        QColor handleColor("#4A90E2");
+        handleColor.setAlpha(150);
+        painter.setBrush(handleColor);
+        painter.setPen(Qt::NoPen);
+        painter.drawPolygon(points, 3);
+    }
 }
 
 int MainWindow::getMouseRegion(const QPoint &pos) const {
@@ -782,28 +807,33 @@ void MainWindow::updateCursorShape(const QPoint &pos) {
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
-    QPoint pos;
+    if (event->button() == Qt::LeftButton) {
+        // 检查是否点击在标题栏上
+        if (titleBar->geometry().contains(event->pos())) {
+            m_bDrag = true;
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-    pos = event->globalPos();
+            dragPos = event->globalPos() - frameGeometry().topLeft();
 #else
-    pos = event->globalPosition().toPoint();
+            dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
 #endif
-
-    // 使用position()替代y()
-    int y = event->position().y();
-    if (y < titleBar->height()) {
-        dragPos = pos - frameGeometry().topLeft();
-        m_bDrag = true;
-        event->accept();
-        return;
+            event->accept();
+            return;
+        }
+        
+        // 检查是否点击在窗口边缘（用于调整大小）
+        mousePressRegion = static_cast<Direction>(getMouseRegion(event->pos()));
+        if (mousePressRegion != NONE) {
+#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
+            resizeStartPos = event->globalPos();
+#else
+            resizeStartPos = event->globalPosition().toPoint();
+#endif
+            resizeStartGeom = geometry();
+            event->accept();
+            return;
+        }
     }
-
-    mousePressRegion = static_cast<Direction>(getMouseRegion(event->pos()));
-    if (mousePressRegion == NONE) return;
-
-    resizeStartPos = pos;
-    resizeStartGeom = geometry();
-    event->accept();
+    QMainWindow::mousePressEvent(event);
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
@@ -872,19 +902,26 @@ void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
     setCursor(Qt::ArrowCursor);
 }
 
+void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
+    // 双击标题栏切换最大化状态
+    if (event->button() == Qt::LeftButton && titleBar->geometry().contains(event->pos())) {
+        toggleMaximize();
+        event->accept();
+        return;
+    }
+    QMainWindow::mouseDoubleClickEvent(event);
+}
+
 // 在resizeEvent函数中添加读取逻辑
 // 新增：创建问题按钮
 void MainWindow::createQuestionButtons() {
-    // 如果用户已经提问或者按钮已经显示过，则不创建按钮
-    if (hasAskedQuestion || buttonsShown) {
-        // 确保停止加载动画
-        /*
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-        */
+    // 如果用户已经提问，则不创建按钮
+    if (hasAskedQuestion) {
         return;
     }
+    
+    // 重置按钮显示状态
+    buttonsShown = true;
     
     // 从hobbies.json读取兴趣及其权重
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -1091,8 +1128,51 @@ void MainWindow::onQuestionButtonClicked() {
     QPushButton *button = qobject_cast<QPushButton*>(sender());
     if (!button) return;
     
-    // 获取按钮文本作为问题
+    // 获取问题文本
     QString question = button->text();
+    
+    // 清空输入框并添加用户消息到聊天窗口
+    ui->lineEditInput->clear();
+    ui->textEditChat->append("<div style='text-align:right;'><span style='background-color:#DCF8C6;padding:5px;border-radius:5px;'>" + question + "</span></div>");
+    
+    // 记录用户消息到当前会话
+    QJsonObject chatMessage;
+    chatMessage["role"] = "user";
+    chatMessage["content"] = question;
+    
+    // 查找当前会话
+    for (int i = 0; i < chatHistories.size(); i++) {
+        if (chatHistories[i]["id"].toString() == currentChatId) {
+            QJsonArray messages = chatHistories[i]["messages"].toArray();
+            messages.append(chatMessage);
+            chatHistories[i]["messages"] = messages;
+            
+            // 更新会话标题（使用用户的第一条消息作为标题）
+            if (messages.size() == 1) {
+                QString title = question;
+                if (title.length() > 20) {
+                    title = title.left(20) + "...";
+                }
+                chatHistories[i]["title"] = title;
+                
+                // 更新UI中的标题
+                QListWidgetItem* item = chatHistoryList->item(i);
+                if (item) {
+                    QWidget* widget = chatHistoryList->itemWidget(item);
+                    if (widget) {
+                        QLabel* titleLabel = widget->findChild<QLabel*>();
+                        if (titleLabel) {
+                            titleLabel->setText(title);
+                        }
+                    }
+                }
+            }
+            break;
+        }
+    }
+    
+    // 保存聊天历史
+    saveChatHistory();
     
     // 设置加载状态
     isLoading = true;
@@ -1107,15 +1187,10 @@ void MainWindow::onQuestionButtonClicked() {
     
     // 设置标志，防止再次显示问题按钮
     buttonsShown = true;
-    hasAskedQuestion = true;  // 添加这一行，确保记录用户已提问
+    hasAskedQuestion = true;  // 确保记录用户已提问
     
-    // 添加用户消息到聊天窗口
-    ui->textEditChat->append("<div style='color:#4A90E2; font-weight:bold;'>你:</div>");
-    ui->textEditChat->append("<div style='margin-left:10px;'>" + question + "</div>");
-    ui->textEditChat->append("<br>");
-    
-    // 发送优化请求
-    sendChatRequest(question, true);
+    // 发送聊天请求
+    sendChatRequest(question, false);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event) {
@@ -1138,6 +1213,14 @@ void MainWindow::resizeEvent(QResizeEvent *event) {
     if (titleLayout) {
         titleLayout->setContentsMargins(12 * m_scale, 0, 12 * m_scale, 0);
         titleLayout->setSpacing(10 * m_scale);
+    }
+    
+    // 在最大化状态下，确保输入栏位于窗口底部
+    if (isMaximized()) {
+        QVBoxLayout *mainLayout = qobject_cast<QVBoxLayout*>(ui->centralwidget->layout());
+        if (mainLayout) {
+            mainLayout->setContentsMargins(0, 0, 0, 0);
+        }
     }
 
     // 确保画像按钮只创建一次
@@ -1391,18 +1474,16 @@ void MainWindow::openCustomizePage()
 // 新增：创建新会话
 void MainWindow::createNewChat()
 {
-    // 清空聊天窗口
-    ui->textEditChat->clear();
-    
     // 生成唯一ID
-    currentChatId = QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
+    QString chatId = QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
     
-    // 创建新会话对象
+    // 创建新的聊天会话
     QJsonObject chatHistory;
-    chatHistory["id"] = currentChatId;
+    chatHistory["id"] = chatId;
     chatHistory["title"] = "新会话";
     chatHistory["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     chatHistory["messages"] = QJsonArray();
+    chatHistory["isCustomizeSession"] = false;
     
     // 添加到会话列表
     chatHistories.prepend(chatHistory);
@@ -1414,8 +1495,15 @@ void MainWindow::createNewChat()
     // 保存聊天历史
     saveChatHistory();
     
+    // 设置当前会话ID
+    currentChatId = chatId;
+    
+    // 清空聊天窗口
+    ui->textEditChat->clear();
+    
     // 重置问题状态
     hasAskedQuestion = false;
+    buttonsShown = false;
     
     // 创建问题按钮
     createQuestionButtons();
@@ -1501,7 +1589,72 @@ void MainWindow::loadChatHistories()
     // 更新UI
     chatHistoryList->clear();
     for (const QJsonObject &chatHistory : chatHistories) {
-        chatHistoryList->addItem(chatHistory["title"].toString());
+        // 创建一个包含会话标题和删除按钮的小部件
+        QWidget* itemWidget = new QWidget(chatHistoryList);
+        QHBoxLayout* layout = new QHBoxLayout(itemWidget);
+        layout->setContentsMargins(5, 2, 5, 2);
+        layout->setSpacing(5);
+        
+        // 会话标题标签
+        QLabel* titleLabel = new QLabel(chatHistory["title"].toString(), itemWidget);
+        titleLabel->setStyleSheet("background: transparent;");
+        
+        // 删除按钮
+        QPushButton* deleteBtn = new QPushButton("×", itemWidget);
+        deleteBtn->setFixedSize(20, 20);
+        deleteBtn->setStyleSheet(R"(
+            QPushButton {
+                color: #888;
+                background: transparent;
+                border: none;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                color: red;
+            }
+        )");
+        
+        // 连接删除按钮的点击信号
+        connect(deleteBtn, &QPushButton::clicked, this, [this, chatHistory]() {
+            // 找到要删除的会话索引
+            QString idToDelete = chatHistory["id"].toString();
+            int indexToDelete = -1;
+            
+            for (int i = 0; i < chatHistories.size(); i++) {
+                if (chatHistories[i]["id"].toString() == idToDelete) {
+                    indexToDelete = i;
+                    break;
+                }
+            }
+            
+            if (indexToDelete != -1) {
+                // 如果删除的是当前会话，创建一个新会话
+                bool isCurrentChat = (currentChatId == idToDelete);
+                
+                // 从列表中移除会话
+                chatHistories.removeAt(indexToDelete);
+                delete chatHistoryList->takeItem(indexToDelete);
+                
+                // 保存更新后的会话历史
+                saveChatHistory();
+                
+                // 如果删除的是当前会话，创建一个新会话
+                if (isCurrentChat) {
+                    createNewChat();
+                }
+            }
+        });
+        
+        layout->addWidget(titleLabel, 1); // 标题占据剩余空间
+        layout->addWidget(deleteBtn, 0);  // 删除按钮不拉伸
+        
+        itemWidget->setLayout(layout);
+        
+        // 创建列表项并设置自定义小部件
+        QListWidgetItem* item = new QListWidgetItem(chatHistoryList);
+        item->setSizeHint(QSize(chatHistoryList->width(), 30)); // 设置合适的高度
+        chatHistoryList->setItemWidget(item, itemWidget);
     }
 }
 
