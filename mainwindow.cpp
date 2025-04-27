@@ -1477,33 +1477,95 @@ void MainWindow::createNewChat()
     // 生成唯一ID
     QString chatId = QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
     
-    // 创建新的聊天会话
+    // 创建新会话对象
     QJsonObject chatHistory;
     chatHistory["id"] = chatId;
     chatHistory["title"] = "新会话";
-    chatHistory["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
     chatHistory["messages"] = QJsonArray();
-    chatHistory["isCustomizeSession"] = false;
     
     // 添加到会话列表
     chatHistories.prepend(chatHistory);
     
     // 更新UI
-    chatHistoryList->insertItem(0, "新会话");
+    QListWidgetItem* item = new QListWidgetItem();
+    
+    // 创建一个包含会话标题和删除按钮的小部件
+    QWidget* itemWidget = new QWidget();
+    QHBoxLayout* layout = new QHBoxLayout(itemWidget);
+    layout->setContentsMargins(5, 2, 5, 2);
+    layout->setSpacing(5);
+    
+    // 会话标题标签
+    QLabel* titleLabel = new QLabel("新会话", itemWidget);
+    titleLabel->setStyleSheet("background: transparent;");
+    
+    // 删除按钮
+    QPushButton* deleteBtn = new QPushButton("×", itemWidget);
+    deleteBtn->setFixedSize(20, 20);
+    deleteBtn->setStyleSheet(R"(
+        QPushButton {
+            color: #888;
+            background: transparent;
+            border: none;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        QPushButton:hover {
+            color: red;
+        }
+    )");
+    
+    // 连接删除按钮的点击信号
+    connect(deleteBtn, &QPushButton::clicked, this, [this, chatId]() {
+        // 找到要删除的会话索引
+        int indexToDelete = -1;
+        
+        for (int i = 0; i < chatHistories.size(); i++) {
+            if (chatHistories[i]["id"].toString() == chatId) {
+                indexToDelete = i;
+                break;
+            }
+        }
+        
+        if (indexToDelete != -1) {
+            // 如果删除的是当前会话，创建一个新会话
+            bool isCurrentChat = (currentChatId == chatId);
+            
+            // 从列表中移除会话
+            chatHistories.removeAt(indexToDelete);
+            delete chatHistoryList->takeItem(indexToDelete);
+            
+            // 保存更新后的会话历史
+            saveChatHistory();
+            
+            // 如果删除的是当前会话，创建一个新会话
+            if (isCurrentChat) {
+                createNewChat();
+            }
+        }
+    });
+    
+    // 修改布局，让标题占据更多空间
+    layout->addWidget(titleLabel, 1); // 标题占据剩余空间
+    layout->addWidget(deleteBtn, 0);  // 删除按钮不拉伸
+    
+    // 设置布局
+    itemWidget->setLayout(layout);
+    
+    // 设置列表项
+    item->setSizeHint(QSize(chatHistoryList->width() - 10, 30));
+    chatHistoryList->insertItem(0, item);
+    chatHistoryList->setItemWidget(item, itemWidget);
     chatHistoryList->setCurrentRow(0);
     
-    // 保存聊天历史
-    saveChatHistory();
-    
-    // 设置当前会话ID
+    // 更新当前会话ID
     currentChatId = chatId;
     
     // 清空聊天窗口
     ui->textEditChat->clear();
     
-    // 重置问题状态
-    hasAskedQuestion = false;
-    buttonsShown = false;
+    // 保存会话历史
+    saveChatHistory();
     
     // 创建问题按钮
     createQuestionButtons();
@@ -1646,14 +1708,17 @@ void MainWindow::loadChatHistories()
             }
         });
         
+        // 修改布局，让标题占据更多空间
         layout->addWidget(titleLabel, 1); // 标题占据剩余空间
         layout->addWidget(deleteBtn, 0);  // 删除按钮不拉伸
         
+        // 设置布局
         itemWidget->setLayout(layout);
         
         // 创建列表项并设置自定义小部件
         QListWidgetItem* item = new QListWidgetItem(chatHistoryList);
-        item->setSizeHint(QSize(chatHistoryList->width(), 30)); // 设置合适的高度
+        // 设置合适的高度，确保整个内容可见
+        item->setSizeHint(QSize(chatHistoryList->width() - 10, 30));
         chatHistoryList->setItemWidget(item, itemWidget);
     }
 }
