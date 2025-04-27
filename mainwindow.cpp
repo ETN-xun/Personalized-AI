@@ -433,8 +433,8 @@ void MainWindow::on_pushButtonSend_clicked() {
     
     // 查找当前会话
     bool isCustomizeSession = false;
-    QString userInfo;
-    QString originalQuestion = message; // 保存原始问题
+    int customizeStep = 0;
+    QString originalQuestion;
     
     for (int i = 0; i < chatHistories.size(); i++) {
         if (chatHistories[i]["id"].toString() == currentChatId) {
@@ -443,18 +443,17 @@ void MainWindow::on_pushButtonSend_clicked() {
             chatHistories[i]["messages"] = messages;
             
             // 检查是否是量身定制会话
-            if (chatHistories[i]["title"].toString() == "量身定制会话") {
+            if (chatHistories[i]["isCustomizeSession"].toBool()) {
                 isCustomizeSession = true;
+                customizeStep = chatHistories[i]["customizeStep"].toInt();
                 
-                // 如果是第一个用户问题，保存为原始问题
-                if (messages.size() == 3) { // 系统消息、AI欢迎消息、用户第一个问题
+                // 如果是第一步，保存原始问题
+                if (customizeStep == 1) {
                     chatHistories[i]["originalQuestion"] = message;
-                    userInfo = chatHistories[i]["userInfo"].toString();
-                }
-                else {
-                    // 如果已经有原始问题，获取它
+                    chatHistories[i]["customizeStep"] = 2; // 更新为第二步
+                    originalQuestion = message;
+                } else {
                     originalQuestion = chatHistories[i]["originalQuestion"].toString();
-                    userInfo = chatHistories[i]["userInfo"].toString();
                 }
             }
             
@@ -476,13 +475,56 @@ void MainWindow::on_pushButtonSend_clicked() {
 
     // 发送聊天请求
     if (isCustomizeSession) {
-        // 使用量身定制的特殊提示格式
-        QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
-                               "以下是我的基本信息：%2。请你根据我的基本信息来为我制定一张计划表，"
-                               "表上的内容是我为了解决我的问题每日需要完成的任务")
-                               .arg(originalQuestion, userInfo);
-        
-        sendCustomizedChatRequest(prompt);
+        if (customizeStep == 1) {
+            // 第一步：用户刚输入问题，AI需要询问基本信息
+            QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                                   "所以我希望你能向我提几个问题来收集解决这个问题所需的基本信息，"
+                                   "来为我制定个性化的解决方案。你需要将问题一次性全部问出").arg(message);
+            
+            sendCustomizedChatRequest(prompt);
+        } else if (customizeStep == 2) {
+            // 第二步：用户已提供基本信息，生成解决方案
+            QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                                   "以下是我的基本信息：%2。请你根据我的基本信息来为我制定一套个性化方案")
+                                   .arg(originalQuestion, message);
+            
+            sendCustomizedChatRequest(prompt);
+            
+            // 更新会话，添加生成计划表的选项
+            for (int i = 0; i < chatHistories.size(); i++) {
+                if (chatHistories[i]["id"].toString() == currentChatId) {
+                    chatHistories[i]["userInfo"] = message;
+                    chatHistories[i]["customizeStep"] = 3; // 更新为第三步（可以生成计划表）
+                    break;
+                }
+            }
+            saveChatHistory();
+        } else if (customizeStep == 3) {
+            // 第三步：用户可能想要生成计划表或继续提问
+            QString userInfo;
+            
+            // 获取用户信息和原始问题
+            for (int i = 0; i < chatHistories.size(); i++) {
+                if (chatHistories[i]["id"].toString() == currentChatId) {
+                    userInfo = chatHistories[i]["userInfo"].toString();
+                    originalQuestion = chatHistories[i]["originalQuestion"].toString();
+                    break;
+                }
+            }
+            
+            // 检查是否是请求生成计划表
+            if (message.contains("计划表") || message.contains("日程") || message.contains("安排")) {
+                QString prompt = QString("我遇到了%1的问题，现在想要你帮我解决，但因为不同的人需要不同的有针对性的方针，"
+                                       "以下是我的基本信息：%2。请你根据我的基本信息来为我制定一张计划表，"
+                                       "表上的内容是我为了解决我的问题每日需要完成的任务")
+                                       .arg(originalQuestion, userInfo);
+                
+                sendCustomizedChatRequest(prompt);
+            } else {
+                // 普通问题，继续使用个性化上下文
+                sendChatRequest(message, false);
+            }
+        }
     } else {
         sendChatRequest(message, false);
     }
@@ -1306,34 +1348,9 @@ void MainWindow::openCustomizePage()
     }
     buttonsShown = true;
     
-    // 构建用户基本信息
-    QString userInfo = "用户性别：" + userGender + "\n兴趣爱好：";
-    
-    // 读取hobbies.json文件获取用户兴趣爱好
-    QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QFile file(path + "/hobbies.json");
-    QStringList selectedHobbies;
-    
-    if (file.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        if (doc.isArray()) {
-            QJsonArray array = doc.array();
-            for (const QJsonValue &value : array) {
-                QJsonObject obj = value.toObject();
-                if (obj["weight"].toInt() > 0) {
-                    selectedHobbies.append(obj["name"].toString());
-                }
-            }
-        }
-        file.close();
-    }
-    
-    userInfo += selectedHobbies.join("、");
-    
     // 添加引导性问题，提示用户输入问题
-    QString welcomeMessage = "请输入您当前面临的问题，我将根据您的个人信息为您提供个性化的解决方案和计划表。";
+    QString welcomeMessage = "请输入您当前面临的问题，我将为您提供个性化的解决方案。";
     ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>系统: 已进入量身定制模式，AI将根据您的个人信息提供更加个性化的回答</div>");
-    ui->textEditChat->append("<div style='color:#888888; font-style:italic;'>用户信息: " + userInfo.replace("\n", "<br>") + "</div>");
     ui->textEditChat->append("<br>");
     ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
     ui->textEditChat->append("<div style='margin-left:10px;'>" + welcomeMessage + "</div>");
@@ -1342,7 +1359,7 @@ void MainWindow::openCustomizePage()
     // 记录系统消息到当前会话
     QJsonObject systemMessage;
     systemMessage["role"] = "system";
-    systemMessage["content"] = "你是一个专业的问题解决顾问，擅长针对不同用户的需求提供个性化的解决方案和计划表。请根据以下用户信息，为用户提供个性化的帮助和建议：\n\n" + userInfo;
+    systemMessage["content"] = "你是一个专业的问题解决顾问，擅长针对不同用户的需求提供个性化的解决方案和计划表。";
     
     QJsonObject aiMessage;
     aiMessage["role"] = "assistant";
@@ -1360,8 +1377,9 @@ void MainWindow::openCustomizePage()
             chatHistories[i]["title"] = "量身定制会话";
             chatHistoryList->item(i)->setText("量身定制会话");
             
-            // 存储用户信息，用于后续请求
-            chatHistories[i]["userInfo"] = userInfo;
+            // 标记为量身定制会话的第一步
+            chatHistories[i]["isCustomizeSession"] = true;
+            chatHistories[i]["customizeStep"] = 1;
             break;
         }
     }
