@@ -16,7 +16,8 @@ SOURCES += \
     hobbyselectdialog.cpp \
     main.cpp \
     mainwindow.cpp \
-    markdownparser.cpp
+    markdownparser.cpp \
+    topics_data.cpp
 
 HEADERS += \
     customizepage.h \

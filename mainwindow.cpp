@@ -22,6 +22,7 @@
 #include <QCoreApplication>
 #include "markdownparser.h"
 #include <QScrollBar>  // 添加QScrollBar头文件
+#include "topics_data.h" // 包含新的头文件
 MainWindow::MainWindow(QWidget *parent)
 : QMainWindow(parent),
 ui(new Ui::MainWindow),
@@ -1066,24 +1067,15 @@ void MainWindow::createQuestionButtons() {
     QStringList newQuestions;
     QStringList selectedHobbies; // 临时数组存储选择的兴趣
     
-    // 读取topics.json文件
-    QFile topicsFile(path + "/topics.json");
-    QJsonObject topicsData;
-    
-    if (topicsFile.open(QIODevice::ReadOnly)) {
-        QJsonDocument topicsDoc = QJsonDocument::fromJson(topicsFile.readAll());
-        if (topicsDoc.isObject()) {
-            topicsData = topicsDoc.object();
-        }
-        topicsFile.close();
-    }
+    // 从 TopicsData 获取话题数据
+    const QMap<QString, QStringList>& topicsData = TopicsData::getAllTopics();
     
     for (int i = 0; i < 3; i++) {
         QString selectedHobby;
-        
+
         // 10%概率选择权重为0的兴趣，90%概率按权重选择权重大于0的兴趣
         bool useZeroWeight = (QRandomGenerator::global()->bounded(100) < 10) && !zeroWeightHobbies.isEmpty();
-        
+
         if (useZeroWeight) {
             // 随机选择一个权重为0的兴趣
             int randomIndex = QRandomGenerator::global()->bounded(zeroWeightHobbies.size());
@@ -1092,7 +1084,7 @@ void MainWindow::createQuestionButtons() {
             // 按权重随机选择一个权重大于0的兴趣
             int randomValue = QRandomGenerator::global()->bounded(totalWeight);
             int accumulatedWeight = 0;
-            
+
             for (int j = 0; j < positiveWeightHobbies.size(); j++) {
                 accumulatedWeight += positiveWeights.at(j);
                 if (randomValue < accumulatedWeight) {
@@ -1100,31 +1092,41 @@ void MainWindow::createQuestionButtons() {
                     break;
                 }
             }
+            // 如果循环结束仍未选择（可能由于浮点误差或边界情况），选择最后一个
+            if (selectedHobby.isEmpty() && !positiveWeightHobbies.isEmpty()) {
+                 selectedHobby = positiveWeightHobbies.last();
+            }
+
         } else {
             // 如果没有任何兴趣，使用默认问题
             newQuestions << "1+1等于几？" << "2+2等于5吗？" << "3+3小于10吗？";
+            //selectedHobbiesForButtons << "" << "" << ""; // 添加空占位符
             break;
         }
-        
-        // 从topics.json中获取与所选兴趣相关的问题
+
+        // 从 topicsData 中获取与所选兴趣相关的问题
         if (!selectedHobby.isEmpty()) {
-            selectedHobbies.append(selectedHobby); // 将选择的兴趣添加到临时数组
-            
-            if (topicsData.contains(selectedHobby) && topicsData[selectedHobby].isArray()) {
-                QJsonArray hobbyTopics = topicsData[selectedHobby].toArray();
+            selectedHobbies.append(selectedHobby); // 将选择的兴趣添加到按钮对应列表
+
+            if (topicsData.contains(selectedHobby)) {
+                const QStringList& hobbyTopics = topicsData.value(selectedHobby);
                 if (!hobbyTopics.isEmpty()) {
                     // 随机选择一个问题
                     int randomTopicIndex = QRandomGenerator::global()->bounded(hobbyTopics.size());
-                    QString question = hobbyTopics[randomTopicIndex].toString();
+                    QString question = hobbyTopics.at(randomTopicIndex);
                     newQuestions.append(question);
                 } else {
                     // 如果该兴趣没有问题，使用默认问题
                     newQuestions.append("你对" + selectedHobby + "有什么看法？");
                 }
             } else {
-                // 如果在topics.json中找不到该兴趣，使用默认问题
+                // 如果在 topicsData 中找不到该兴趣，使用默认问题
                 newQuestions.append("你对" + selectedHobby + "有什么看法？");
             }
+        } else {
+             // 如果没有选出兴趣（例如所有兴趣权重都为0且未触发10%概率），添加默认问题和空兴趣
+             newQuestions.append("今天天气怎么样？"); // 或者其他通用问题
+             //selectedHobbiesForButtons.append("");
         }
     }
     
