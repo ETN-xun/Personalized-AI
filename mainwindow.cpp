@@ -1557,26 +1557,36 @@ void MainWindow::createNewChat()
 // 新增：加载历史会话
 void MainWindow::loadChatHistory(int index)
 {
-    if (index < 0 || index >= chatHistories.size()) return;
-    
-    // 获取选中的会话
-    QJsonObject chatHistory = chatHistories[index];
-    currentChatId = chatHistory["id"].toString();
+    if (index < 0 || index >= chatHistories.size()) {
+        return;
+    }
     
     // 清空聊天窗口
     ui->textEditChat->clear();
     
+    // 获取选中的会话
+    QJsonObject chat = chatHistories[index];
+    currentChatId = chat["id"].toString();
+    
     // 加载会话消息
-    QJsonArray messages = chatHistory["messages"].toArray();
-    for (const QJsonValue &value : messages) {
-        QJsonObject message = value.toObject();
+    QJsonArray messages = chat["messages"].toArray();
+    
+    // 创建Markdown解析器
+    MarkdownParser parser;
+    
+    for (int i = 0; i < messages.size(); i++) {
+        QJsonObject message = messages[i].toObject();
         QString role = message["role"].toString();
         QString content = message["content"].toString();
         
         if (role == "user") {
+            // 用户消息
             ui->textEditChat->append("<div style='text-align:right;'><span style='background-color:#DCF8C6;padding:5px;border-radius:5px;'>" + content + "</span></div>");
         } else if (role == "assistant") {
-            ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + content + "</span></div>");
+            // AI助手消息 - 使用MarkdownParser处理内容
+            QString htmlContent = parser.toHtml(content);
+            ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
+            ui->textEditChat->append("<div style='margin-left:10px;'>" + htmlContent + "</div>");
         }
     }
     
