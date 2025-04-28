@@ -561,31 +561,28 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                         }
                     }
                     
+                    // 将AI回复添加到聊天窗口
+                    ui->textEditChat->append("<div style='text-align:left;'><span style='background-color:#E1F5FE;padding:5px;border-radius:5px;'>" + htmlContent + "</span></div>");
+                    
+                    // 将AI回复保存到聊天历史
                     if (historyIndex != -1) {
-                        // 更新对应的聊天历史
-                        QJsonArray messages = chatHistories[historyIndex]["messages"].toArray();
                         QJsonObject aiMessage;
                         aiMessage["role"] = "assistant";
                         aiMessage["content"] = response;
+                        
+                        QJsonArray messages = chatHistories[historyIndex]["messages"].toArray();
                         messages.append(aiMessage);
                         chatHistories[historyIndex]["messages"] = messages;
+                        
+                        // 保存聊天历史
                         saveChatHistory();
-                        
-                        // 如果当前显示的不是请求发起的会话，则不更新UI
-                        if (currentChatId != chatId) {
-                            return;
-                        }
-                        
-                        // 添加AI回复到聊天窗口 - 确保左对齐
-                        ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>"); 
-                        ui->textEditChat->append("<div style='margin-left:10px;'>" + htmlContent + "</div>"); 
                     }
-                } 
-            } 
-        } else { 
-            // 处理错误情况 
-            ui->textEditChat->append("<div style='color:red;'>错误: " + reply->errorString() + "</div>"); 
-        } 
+                }
+            }
+        } else {
+            // 处理错误情况
+            ui->textEditChat->append("<div style='color:red;'>请求失败: " + reply->errorString() + "</div>");
+        }
     } else if (requestType == "optimization") { 
         // 处理优化响应 
         if (reply->error() == QNetworkReply::NoError) { 
@@ -1795,15 +1792,12 @@ void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
     
     json["messages"] = messages;
     
-    // 创建网络请求
     QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8().data());
     
-    // 发送请求
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
-    
-    // 设置请求类型属性，以便在回调中区分
     reply->setProperty("requestType", "customized");
+    reply->setProperty("originalInput", prompt);
 }
 
