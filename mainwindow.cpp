@@ -160,6 +160,7 @@ thinkingTimer(new QTimer(this)) // 初始化思考定时器
         QPushButton:pressed { background: #3A7BFF; }
     )");
     
+    /*
     // 修改"量身定制"按钮位置
     customizeBtn = new QPushButton("量身定制", this);
     customizeBtn->setFixedSize(100, 35);
@@ -184,6 +185,7 @@ thinkingTimer(new QTimer(this)) // 初始化思考定时器
 
     // 连接量身定制按钮的点击信号
     connect(customizeBtn, &QPushButton::clicked, this, &MainWindow::openCustomizePage);
+    */
     
     connect(ui->lineEditInput, &QLineEdit::returnPressed, this, [this]() {
         // 设置标志，表示用户已经提过问题
