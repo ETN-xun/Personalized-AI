@@ -282,6 +282,25 @@ thinkingTimer(new QTimer(this)) // 初始化思考定时器
         }
     )");
     connect(newChatBtn, &QPushButton::clicked, this, &MainWindow::createNewChat);
+
+        // 修改"量身定制"按钮位置 - 从标题栏移到侧边栏
+        customizeBtn = new QPushButton("量身定制", sideBar);
+        customizeBtn->setStyleSheet(R"(
+            QPushButton {
+                background-color: #4A90E2;
+                color: white;
+                border-radius: 5px;
+                padding: 8px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #63B8FF;
+            }
+            QPushButton:pressed {
+                background-color: #3A7BFF;
+            }
+        )");
+        connect(customizeBtn, &QPushButton::clicked, this, &MainWindow::openCustomizePage);
     
     // 创建会话历史列表
     chatHistoryList = new QListWidget(sideBar);
@@ -305,7 +324,9 @@ thinkingTimer(new QTimer(this)) // 初始化思考定时器
     )");
     connect(chatHistoryList, &QListWidget::currentRowChanged, this, &MainWindow::loadChatHistory);
     
+    // 将按钮和列表添加到侧边栏布局
     sideBarLayout->addWidget(newChatBtn);
+    sideBarLayout->addWidget(customizeBtn); // 将量身定制按钮添加到新会话按钮下方
     sideBarLayout->addWidget(chatHistoryList);
     
     // 调整主窗口布局以适应侧边栏

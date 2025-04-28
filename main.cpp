@@ -6,13 +6,34 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
-// 添加以下两个头文件
 #include <QJsonArray>
 #include <QJsonValue>
+#include <QDir> // 添加QDir头文件到顶部
 
 int main(int argc ,char *argv[]) {
     QApplication a(argc, argv);
-
+    
+    // 设置应用程序信息（用于QStandardPaths）
+    QCoreApplication::setOrganizationName("YourCompany");
+    QCoreApplication::setApplicationName("Personalized-AI");
+    
+    // 获取AppData路径
+    QString appDataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir appDataDir(appDataPath);
+    
+    // 如果目录不存在，创建它
+    if (!appDataDir.exists()) {
+        appDataDir.mkpath(".");
+    }
+    
+    // 检查topics.json是否存在，如果不存在则从资源复制
+    QFile topicsFile(appDataPath + "/topics.json");
+    if (!topicsFile.exists()) {
+        // 从应用程序目录复制文件
+        QString exeDir = QCoreApplication::applicationDirPath();
+        QFile::copy(exeDir + "/topics.json", appDataPath + "/topics.json");
+    }
+    
     QString gender;
     QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QFile file(path + "/gender_info.json");
@@ -68,9 +89,4 @@ int main(int argc ,char *argv[]) {
 
     return a.exec();
 }
-#include <QStandardPaths>  // 添加QStandardPaths头文件
-#include <QFile>           // 添加QFile头文件
-#include <QJsonDocument>   // 添加JSON支持
-#include <QJsonObject>     // 添加JSON对象支持
-#include <QJsonArray>
-#include <QJsonValue>
+// 删除底部重复的头文件包含
