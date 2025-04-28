@@ -32,6 +32,9 @@ QString MarkdownParser::toHtml(const QString &markdown) {
     // 处理换行
     html.replace("\n", "<br>");
     
+    // 添加全局左对齐样式
+    html = "<div style='text-align: left;'>" + html + "</div>";
+    
     return html;
 }
 
@@ -98,11 +101,11 @@ QString MarkdownParser::processBulletLists(QString text) {
         
         // 将每一行转换为列表项
         QRegularExpression itemRegex("^\\s*[-*+]\\s+(.*?)$", QRegularExpression::MultilineOption);
-        QString htmlList = "<ul style='margin-left:20px;'>\n";
+        QString htmlList = "<ul style='margin-left:20px;text-align:left;'>\n";
         QRegularExpressionMatchIterator itemMatches = itemRegex.globalMatch(listContent);
         while (itemMatches.hasNext()) {
             QRegularExpressionMatch itemMatch = itemMatches.next();
-            htmlList += "<li>" + itemMatch.captured(1) + "</li>\n";
+            htmlList += "<li style='text-align:left;'>" + itemMatch.captured(1) + "</li>\n";
         }
         htmlList += "</ul>";
         
@@ -112,23 +115,42 @@ QString MarkdownParser::processBulletLists(QString text) {
 }
 
 QString MarkdownParser::processNumberedLists(QString text) {
-    // 处理有序列表
-    QRegularExpression listRegex("((?:^\\s*\\d+\\.\\s+.*?$\\n?)+)", QRegularExpression::MultilineOption);
+    // 处理有序列表 - 同时支持"1. "和"1、"两种格式
+    QRegularExpression listRegex("((?:^\\s*\\d+[\\.、]\\s+.*?$\\n?)+)", QRegularExpression::MultilineOption);
     QRegularExpressionMatchIterator matches = listRegex.globalMatch(text);
     while (matches.hasNext()) {
         QRegularExpressionMatch match = matches.next();
         QString listContent = match.captured(1);
         
         // 将每一行转换为列表项
-        QRegularExpression itemRegex("^\\s*\\d+\\.\\s+(.*?)$", QRegularExpression::MultilineOption);
+        QRegularExpression itemRegex("^\\s*(\\d+)[\\.、]\\s+(.*?)$", QRegularExpression::MultilineOption);
         QString htmlList = "<ol style='margin-left:20px;'>\n";
         QRegularExpressionMatchIterator itemMatches = itemRegex.globalMatch(listContent);
+        
+        // 获取所有列表项
+        QList<QPair<int, QString>> items;
         while (itemMatches.hasNext()) {
             QRegularExpressionMatch itemMatch = itemMatches.next();
-            htmlList += "<li>" + itemMatch.captured(1) + "</li>\n";
+            int number = itemMatch.captured(1).toInt();
+            QString content = itemMatch.captured(2);
+            items.append(qMakePair(number, content));
         }
-        htmlList += "</ol>";
         
+        // 生成HTML列表
+        if (!items.isEmpty()) {
+            // 检查是否需要设置起始值
+            int startValue = items.first().first;
+            if (startValue != 1) {
+                htmlList = QString("<ol start=\"%1\" style='margin-left:20px;'>\n").arg(startValue);
+            }
+            
+            // 添加所有列表项
+            for (const auto &item : items) {
+                htmlList += QString("<li value=\"%1\">%2</li>\n").arg(item.first).arg(item.second);
+            }
+        }
+        
+        htmlList += "</ol>";
         text.replace(match.captured(0), htmlList);
     }
     return text;
