@@ -111,6 +111,7 @@ private:
     QListWidget *chatHistoryList;
     QPushButton *newChatBtn;
     QString currentChatId;
+    QString requestChatId;  // 新增：记录发送请求时的会话ID
     QList<QJsonObject> chatHistories;
 };
 
