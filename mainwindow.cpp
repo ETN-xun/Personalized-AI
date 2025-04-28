@@ -1585,86 +1585,69 @@ void MainWindow::loadChatHistory(int index) {
         return;
     }
     
-    // 清空当前聊天内容
+    // 清空聊天窗口
     ui->textEditChat->clear();
     
-    // 获取选中的聊天历史
+    // 获取选中的会话
     QJsonObject chatHistory = chatHistories[index];
     currentChatId = chatHistory["id"].toString();
     
-    // 显示聊天历史
+    // 加载会话消息
     QJsonArray messages = chatHistory["messages"].toArray();
+    
+    // 检查是否是空白会话
+    bool isEmptyChat = messages.isEmpty();
+    
+    // 根据会话是否为空决定是否显示推荐问题按钮
+    if (!isEmptyChat) {
+        // 如果是空白会话，隐藏所有问题按钮
+        for (QPushButton* btn : questionButtons) {
+            if (btn) {
+                btn->hide();
+            }
+        }
+        buttonsShown = false; // 重置标志，允许在用户输入后再次创建
+        hasAskedQuestion = false; // 重置用户提问标志
+    } else {
+        // 如果不是空白会话，显示并重新生成推荐问题
+        // 先清除现有按钮
+        for (QPushButton* btn : questionButtons) {
+            if (btn) {
+                btn->deleteLater();
+            }
+        }
+        questionButtons.clear();
+        buttonsShown = false; // 重置标志，允许重新创建
+        
+        // 重新生成推荐问题按钮
+        createQuestionButtons();
+    }
+    
+    // 显示会话消息
     for (int i = 0; i < messages.size(); i++) {
         QJsonObject message = messages[i].toObject();
         QString role = message["role"].toString();
         QString content = message["content"].toString();
         
         if (role == "user") {
-            // 显示用户消息
             ui->textEditChat->append("<div style='text-align:right;'><span style='background-color:#DCF8C6;padding:5px;border-radius:5px;'>" + content + "</span></div>");
         } else if (role == "assistant") {
             // 使用MarkdownParser处理AI回复内容
             MarkdownParser parser;
             QString htmlContent = parser.toHtml(content);
-            
-            // 显示AI回复
-            ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
-            ui->textEditChat->append("<div style='margin-left:10px;'>" + htmlContent + "</div>");
+            ui->textEditChat->append("<div style='text-align:left;'><span style='background-color:#FFFFFF;padding:5px;border-radius:5px;'>" + htmlContent + "</span></div>");
         }
     }
     
-    // 如果是量身定制会话，显示相关按钮
-    if (chatHistory["isCustomizeSession"].toBool()) {
-        int customizeStep = chatHistory["customizeStep"].toInt();
-        if (customizeStep == 3) {
-            // 显示生成计划表按钮
-            QPushButton *planBtn = new QPushButton("生成计划表", this);
-            planBtn->setStyleSheet(R"(
-                QPushButton {
-                    background-color: #4A90E2;
-                    color: white;
-                    border-radius: 5px;
-                    padding: 8px;
-                    font-size: 14px;
-                }
-                QPushButton:hover {
-                    background-color: #63B8FF;
-                }
-                QPushButton:pressed {
-                    background-color: #3A7BFF;
-                }
-            )");
-            connect(planBtn, &QPushButton::clicked, this, [this]() {
-                ui->lineEditInput->setText("请为我生成一个计划表");
-                ui->pushButtonSend->click();
-            });
-            
-            // 添加按钮到聊天窗口
-            QTextCursor cursor = ui->textEditChat->textCursor();
-            cursor.movePosition(QTextCursor::End);
-            ui->textEditChat->setTextCursor(cursor);
-            
-            QTextBlockFormat blockFormat;
-            blockFormat.setAlignment(Qt::AlignCenter);
-            cursor.insertBlock(blockFormat);
-            
-            QTextCharFormat charFormat;
-            cursor.insertText("\n");
-            
-            // 将按钮添加到文本编辑器
-            ui->textEditChat->setTextCursor(cursor);
-            ui->textEditChat->insertHtml("<div style='text-align:center;'></div>");
-            
-            // 使用QTextEdit的布局添加按钮
-            QVBoxLayout *layout = qobject_cast<QVBoxLayout*>(ui->centralwidget->layout());
-            if (layout) {
-                layout->addWidget(planBtn);
-            }
-        }
+    // 检查是否是量身定制会话
+    bool isCustomizeSession = chatHistory["isCustomizeSession"].toBool();
+    if (isCustomizeSession) {
+        // 更新标题
+        titleLabel->setText("个性化AI助手 - 量身定制");
+    } else {
+        // 更新标题
+        titleLabel->setText("个性化AI助手");
     }
-    
-    // 滚动到底部
-    //ui->textEditChat->verticalScrollBar()->setValue(ui->textEditChat->verticalScrollBar()->maximum());
 }
 
 // 新增：保存聊天历史
