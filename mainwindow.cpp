@@ -774,28 +774,28 @@ void MainWindow::showEvent(QShowEvent *event) {
 
 void MainWindow::toggleMaximize() {
     if (isMaximized()) {
-        // 从最大化状态恢复时添加动画
-        QRect currentGeom = geometry();
-        QRect targetGeom = resizeStartGeom.isValid() ? resizeStartGeom : QRect(100, 100, 800, 600);
+        // 恢复窗口大小
+        QScreen *screen = QGuiApplication::primaryScreen();
+        QRect screenGeometry = screen->availableGeometry();
         
-        // 创建动画
-        QPropertyAnimation *animation = new QPropertyAnimation(this, "geometry");
-        animation->setDuration(300); // 300毫秒的动画时长
-        animation->setStartValue(currentGeom);
-        animation->setEndValue(targetGeom);
-        animation->setEasingCurve(QEasingCurve::OutCubic); // 使用平滑的缓动曲线
+        // 设置窗口大小为屏幕的80%
+        int width = screenGeometry.width() * 0.5;
+        int height = screenGeometry.height() * 0.6;
         
-        // 连接动画完成信号，清理动画对象
-        connect(animation, &QPropertyAnimation::finished, animation, &QPropertyAnimation::deleteLater);
+        // 计算居中位置
+        int x = (screenGeometry.width() - width) / 2;
+        int y = (screenGeometry.height() - height) / 2;
         
-        // 先取消最大化状态，但不改变几何形状
-        setWindowState(windowState() & ~Qt::WindowMaximized);
-        
-        // 启动动画
-        animation->start(QAbstractAnimation::DeleteWhenStopped);
+        // 设置动画
+        m_sizeAnimation->setDuration(300);
+        m_sizeAnimation->setStartValue(geometry());
+        m_sizeAnimation->setEndValue(QRect(x, y, width, height));
+        m_sizeAnimation->setEasingCurve(QEasingCurve::OutCubic);
+        m_sizeAnimation->start();
         
         // 更新最大化按钮图标
         maxBtn->setText("□");
+        showNormal();
     } else {
         // 保存当前几何信息
         QRect startGeom = geometry();
