@@ -19,6 +19,7 @@
 #include <QDateTime>
 #include <QListWidget>
 #include "customizepage.h"
+#include <QCoreApplication>
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -1775,3 +1776,4 @@ void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
     // 设置请求类型属性，以便在回调中区分
     reply->setProperty("requestType", "customized");
 }
+
