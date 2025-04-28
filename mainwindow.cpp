@@ -733,8 +733,8 @@ void MainWindow::showEvent(QShowEvent *event) {
     m_sizeAnimation->start();
     
     // 显示加载指示器
-    isLoading = true;
-    rotationAnimation->start();
+    //isLoading = true;
+    //rotationAnimation->start();
 
     // 使用QTimer延迟创建问题按钮，让窗口先显示出来
     QTimer::singleShot(100, this, [this]() {
@@ -798,7 +798,8 @@ void MainWindow::toggleMaximize() {
 
 void MainWindow::setUserGender(const QString &gender) {
     userGender = gender;
-    titleLabel->setText(tr("智能聊天 - 用户性别：%1").arg(gender));
+    //titleLabel->setText(tr("智能聊天 - 用户性别：%1").arg(gender));
+    titleLabel->setText("个性化AI助手");
     setWindowTitle(titleLabel->text());
 }
 
