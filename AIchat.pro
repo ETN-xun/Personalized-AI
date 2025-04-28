@@ -15,13 +15,15 @@ SOURCES += \
     genderselectdialog.cpp \
     hobbyselectdialog.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    markdownparser.cpp
 
 HEADERS += \
     customizepage.h \
     genderselectdialog.h \
     hobbyselectdialog.h \
-    mainwindow.h
+    mainwindow.h \
+    markdownparser.h
 
 FORMS += \
     mainwindow.ui

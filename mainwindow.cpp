@@ -20,6 +20,7 @@
 #include <QListWidget>
 #include "customizepage.h"
 #include <QCoreApplication>
+#include "markdownparser.h"
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -525,140 +526,110 @@ void MainWindow::on_pushButtonSend_clicked() {
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
-    // 检查请求类型
-    QString requestType = reply->property("requestType").toString();
+    // 停止加载动画 
+    isLoading = false; 
+    rotationAnimation->stop(); 
+    loadIndicator->clear(); 
     
-    // 处理量身定制响应
-    if (requestType == "customized") {
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            if (doc.isObject() && doc.object().contains("choices")) {
-                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
-                QJsonObject message = choice["message"].toObject();
-                if (message.contains("content")) {
-                    QString response = message["content"].toString();
-                    
-                    // 添加AI回复到聊天窗口
-                    ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>");
-                    ui->textEditChat->append("<div style='margin-left:10px;'>" + response + "</span></div>");
-                    ui->textEditChat->append("<br>");
-                    
-                    // 记录AI回复到当前会话
-                    QJsonObject aiMessage;
-                    aiMessage["role"] = "assistant";
-                    aiMessage["content"] = response;
-                    
-                    for (int i = 0; i < chatHistories.size(); i++) {
-                        if (chatHistories[i]["id"].toString() == currentChatId) {
-                            QJsonArray messages = chatHistories[i]["messages"].toArray();
-                            messages.append(aiMessage);
-                            chatHistories[i]["messages"] = messages;
-                            break;
-                        }
-                    }
-                    
-                    // 保存聊天历史
-                    saveChatHistory();
-                }
-            }
-        } else {
-            // 处理错误
-            ui->textEditChat->append("<div style='color:red;'>请求失败：" + reply->errorString() + "</div>");
-        }
-        
-        // 停止加载动画
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-        reply->deleteLater();
-        return; // 提前返回，不执行后面的代码
-    }
-
-    // 处理优化请求回复
-    bool isOptimization = reply->property("requestType").toString() == "optimization";
-    QString originalInput = reply->property("originalInput").toString();
+    // 检查请求类型 
+    QString requestType = reply->property("requestType").toString(); 
     
-    if (isOptimization) {
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-            if (doc.isObject() && doc.object().contains("choices")) {
-                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
-                QJsonObject message = choice["message"].toObject();
-                if (message.contains("content")) {
-                    QString optimizedQuestion = message["content"].toString();
-                    sendChatRequest(optimizedQuestion, false);
-                } else {
-                    sendChatRequest(originalInput, false);
-                }
-            } else {
-                sendChatRequest(originalInput, false);
-            }
-        } else {
-            ui->textEditChat->append(tr("优化请求失败，错误代码：%1").arg(reply->error()));
-            sendChatRequest(originalInput, false);
-        }
-    } else {
-        // 处理普通聊天回复
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-        setRotationAngle(0.0);
+    // 处理量身定制响应 
+    if (requestType == "customized") { 
+        if (reply->error() == QNetworkReply::NoError) { 
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll()); 
+            if (doc.isObject() && doc.object().contains("choices")) { 
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject(); 
+                QJsonObject message = choice["message"].toObject(); 
+                if (message.contains("content")) { 
+                    QString response = message["content"].toString(); 
 
-        if (reply->error() == QNetworkReply::NoError) {
-            QJsonDocument responseDoc = QJsonDocument::fromJson(reply->readAll());
-            QJsonObject responseObj = responseDoc.object();
-            
-            if (responseObj.contains("choices") && responseObj["choices"].isArray()) {
-                QJsonArray choices = responseObj["choices"].toArray();
-                if (!choices.isEmpty() && choices[0].isObject()) {
-                    QJsonObject choice = choices[0].toObject();
-                    if (choice.contains("message") && choice["message"].isObject()) {
-                        QJsonObject message = choice["message"].toObject();
-                        if (message.contains("content")) {
-                            QString content = message["content"].toString();
-                            
-                            ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + content + "</span></div>");
-                            
-                            QJsonObject chatMessage;
-                            chatMessage["role"] = "assistant";
-                            chatMessage["content"] = content;
-                            
-                            for (int i = 0; i < chatHistories.size(); i++) {
-                                if (chatHistories[i]["id"].toString() == currentChatId) {
-                                    QJsonArray messages = chatHistories[i]["messages"].toArray();
-                                    messages.append(chatMessage);
-                                    chatHistories[i]["messages"] = messages;
-                                    break;
-                                }
-                            }
-                            saveChatHistory();
-                        } else {
-                            ui->textEditChat->append(tr("无效响应：未找到内容字段"));
-                        }
-                    } else {
-                        ui->textEditChat->append(tr("无效响应：未找到消息对象"));
-                    }
-                } else {
-                    ui->textEditChat->append(tr("无效响应：choices数组为空"));
-                }
-            } else {
-                ui->textEditChat->append(tr("无效响应：缺少choices数组"));
-            }
-        } else {
-            ui->textEditChat->append(tr("Error: %1").arg(reply->errorString()));
-        }
-    }
-
-    hasAskedQuestion = true;
+                    // 使用MarkdownParser处理AI回复内容 
+                    MarkdownParser parser;
+                    QString htmlContent = parser.toHtml(response);
+                    
+                    // 添加AI回复到聊天窗口 
+                    ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>"); 
+                    ui->textEditChat->append("<div style='margin-left:10px;'>" + htmlContent + "</span></div>"); 
+                } 
+            } 
+        } else { 
+            // 处理错误情况 
+            ui->textEditChat->append("<div style='color:red;'>请求失败: " + reply->errorString() + "</div>"); 
+        } 
+    } else if (requestType == "optimization") { 
+        // 处理优化请求响应 
+        if (reply->error() == QNetworkReply::NoError) { 
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll()); 
+            if (doc.isObject() && doc.object().contains("choices")) { 
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject(); 
+                QJsonObject message = choice["message"].toObject(); 
+                if (message.contains("content")) { 
+                    QString optimizedQuestion = message["content"].toString(); 
+                    
+                    // 发送优化后的问题 
+                    sendChatRequest(optimizedQuestion, false); 
+                } 
+            } 
+        } else { 
+            // 处理错误情况 
+            ui->textEditChat->append("<div style='color:red;'>优化请求失败: " + reply->errorString() + "</div>"); 
+        } 
+    } else { 
+        // 处理普通聊天响应 
+        if (reply->error() == QNetworkReply::NoError) { 
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll()); 
+            if (doc.isObject() && doc.object().contains("choices")) { 
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject(); 
+                QJsonObject message = choice["message"].toObject(); 
+                if (message.contains("content")) { 
+                    QString response = message["content"].toString(); 
+                    
+                    // 使用MarkdownParser处理AI回复内容 
+                    MarkdownParser parser;
+                    QString htmlContent = parser.toHtml(response);
+                    
+                    // 添加AI回复到聊天窗口 
+                    ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>"); 
+                    ui->textEditChat->append("<div><span style='background-color:#F1F0F0;padding:5px;border-radius:5px;'>" + htmlContent + "</span></div>"); 
+                    
+                    // 记录AI回复到当前会话 
+                    QJsonObject chatMessage; 
+                    chatMessage["role"] = "assistant"; 
+                    chatMessage["content"] = response; 
+                    
+                    for (int i = 0; i < chatHistories.size(); i++) { 
+                        if (chatHistories[i]["id"].toString() == currentChatId) { 
+                            QJsonArray messages = chatHistories[i]["messages"].toArray(); 
+                            messages.append(chatMessage); 
+                            chatHistories[i]["messages"] = messages; 
+                            break; 
+                        } 
+                    } 
+                    
+                    // 保存聊天历史 
+                    saveChatHistory(); 
+                } 
+            } 
+        } else { 
+            // 处理错误情况 
+            ui->textEditChat->append("<div style='color:red;'>请求失败: " + reply->errorString() + "</div>"); 
+        } 
+    } 
     
-    for (QPushButton* btn : questionButtons) {
-        if (btn) {
-            btn->hide();
-        }
-    }
-
-    reply->deleteLater();
-    update();
+    // 设置标志，表示用户已经提过问题 
+    hasAskedQuestion = true; 
+    
+    // 隐藏所有问题按钮 
+    for (QPushButton* btn : questionButtons) { 
+        if (btn) { 
+            btn->hide(); 
+        } 
+    } 
+    
+    // 清理资源 
+    reply->deleteLater(); 
+    update(); 
 }
 
 void MainWindow::showEvent(QShowEvent *event) {
