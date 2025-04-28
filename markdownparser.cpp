@@ -29,8 +29,18 @@ QString MarkdownParser::toHtml(const QString &markdown) {
     // 处理行内格式（粗体、斜体等）
     html = processInlineFormats(html);
     
-    // 处理换行
+    // 处理换行 - 修改这部分逻辑
+    // 将连续的两个或更多换行符替换为段落标签
+    QRegularExpression paragraphRegex("\\n{2,}");
+    html.replace(paragraphRegex, "</p><p>");
+    
+    // 处理单个换行符 - 在HTML中保留换行效果
     html.replace("\n", "<br>");
+    
+    // 确保整个内容被段落标签包围
+    if (!html.isEmpty()) {
+        html = "<p>" + html + "</p>";
+    }
     
     // 添加全局左对齐样式
     html = "<div style='text-align: left;'>" + html + "</div>";

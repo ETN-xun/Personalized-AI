@@ -69,11 +69,17 @@ private:
     void saveChatHistory(); // 新增：保存聊天历史
     void loadChatHistories(); // 新增：加载所有聊天历史
     void sendCustomizedChatRequest(const QString &prompt);
+    void showThinkingProcess(); // 新增：显示思考过程
 
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     QString apiKey = "sk-eea6568b51c74da88e91f32f91485ab9"; // 确保使用正确的API密钥
     QString userGender = "未选择"; // 确保声明
+    
+    // 新增：AI思考过程相关
+    QStringList thinkingSteps; // 存储思考步骤
+    int currentThinkingStep; // 当前显示的思考步骤
+    QTimer *thinkingTimer; // 思考过程显示定时器
 
     // 窗口控制
     Direction mousePressRegion = NONE;

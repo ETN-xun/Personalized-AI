@@ -21,32 +21,35 @@
 #include "customizepage.h"
 #include <QCoreApplication>
 #include "markdownparser.h"
+#include <QScrollBar>  // 添加QScrollBar头文件
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent),
-    ui(new Ui::MainWindow),
-    networkManager(new QNetworkAccessManager(this)), // 确保正确初始化顺序
-    apiKey("sk-eea6568b51c74da88e91f32f91485ab9"), // 补全初始化顺序
-    userGender("未选择"), // 补全初始化顺序
-    titleBar(new QWidget(this)),
-    titleLabel(new QLabel(titleBar)),
-    rotationAnimation(new QPropertyAnimation(this, "rotationAngle")),
-    m_sizeAnimation(new QPropertyAnimation(this, "geometry")),
-    loadIndicator(new QLabel(titleBar)),
-    minBtn(nullptr),
-    maxBtn(nullptr),
-    closeBtn(nullptr),
-    portraitBtn(nullptr), // 初始化画像按钮指针
-    portraitWindow(nullptr), // 初始化画像窗口指针
-    m_rotationAngle(0.0),
-    isLoading(false),
-    m_scale(1.0),
-    buttonsShown(false),
-    hasAskedQuestion(false),
-    customizeBtn(nullptr), // 添加量身定制按钮指针
-    sideBar(nullptr),
-    newChatBtn(nullptr),
-    chatHistoryList(nullptr),
-    currentChatId("")
+: QMainWindow(parent),
+ui(new Ui::MainWindow),
+networkManager(new QNetworkAccessManager(this)), // 确保正确初始化顺序
+apiKey("sk-eea6568b51c74da88e91f32f91485ab9"), // 补全初始化顺序
+userGender("未选择"), // 补全初始化顺序
+titleBar(new QWidget(this)),
+titleLabel(new QLabel(titleBar)),
+rotationAnimation(new QPropertyAnimation(this, "rotationAngle")),
+m_sizeAnimation(new QPropertyAnimation(this, "geometry")),
+loadIndicator(new QLabel(titleBar)),
+minBtn(nullptr),
+maxBtn(nullptr),
+closeBtn(nullptr),
+portraitBtn(nullptr), // 初始化画像按钮指针
+portraitWindow(nullptr), // 初始化画像窗口指针
+m_rotationAngle(0.0),
+isLoading(false),
+m_scale(1.0),
+buttonsShown(false),
+hasAskedQuestion(false),
+customizeBtn(nullptr), // 添加量身定制按钮指针
+sideBar(nullptr),
+newChatBtn(nullptr),
+chatHistoryList(nullptr),
+currentChatId(""),
+currentThinkingStep(0), // 初始化思考步骤计数器
+thinkingTimer(new QTimer(this)) // 初始化思考定时器
 {
     // 调整初始化顺序以匹配.h中的成员变量声明顺序
     ui->setupUi(this);
@@ -235,6 +238,19 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 连接网络请求完成信号到槽
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onReplyFinished);
+
+        // ... existing code ...
+    
+    // 连接思考定时器信号
+    connect(thinkingTimer, &QTimer::timeout, this, &MainWindow::showThinkingProcess);
+    
+    // 初始化思考步骤
+    thinkingSteps << "正在分析您的问题..."
+                 << "正在搜索相关信息..."
+                 << "正在组织语言..."
+                 << "正在优化回答..."
+                 << "正在检查准确性..."
+                 << "即将完成回答...";
     
     // 设置窗口标题
     titleLabel->setText("个性化AI助手");
@@ -345,6 +361,19 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
     requestChatId = currentChatId;
     // 设置加载状态
     isLoading = true;
+    rotationAnimation->start();
+        // 重置思考步骤计数器
+        currentThinkingStep = 0;
+
+            // 开始显示思考过程
+    showThinkingProcess();
+    thinkingTimer->start(1500); // 每1.5秒更新一次思考过程
+    
+    // 启动旋转动画
+    rotationAnimation->setStartValue(0.0);
+    rotationAnimation->setEndValue(360.0);
+    rotationAnimation->setDuration(1500);
+    rotationAnimation->setLoopCount(-1); // 无限循环
     rotationAnimation->start();
 
     // 设置标志，防止再次显示问题按钮
@@ -527,10 +556,25 @@ void MainWindow::on_pushButtonSend_clicked() {
 }
 
 void MainWindow::onReplyFinished(QNetworkReply *reply) {
+        // 停止思考定时器
+        thinkingTimer->stop();
+    
+        // 停止旋转动画
+        rotationAnimation->stop();
     // 停止加载动画 
-    isLoading = false; 
+    isLoading = false;
     rotationAnimation->stop(); 
     loadIndicator->clear(); 
+
+        // 获取当前聊天内容
+            // 修改这一行，将 textBrowserChat 改为 textEditChat
+    QString currentHtml = ui->textEditChat->toHtml();
+    
+        // 移除思考过程
+        QRegularExpression thinkingRegex("<div class=\"thinking-process\">.*?</div>");
+        currentHtml.replace(thinkingRegex, "");
+            // 修改这一行，将 textBrowserChat 改为 textEditChat
+    ui->textEditChat->setHtml(currentHtml);
     
     // 使用发送请求时的会话ID而不是当前会话ID
     QString chatId = requestChatId;
@@ -538,50 +582,63 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
     // 检查请求类型 
     QString requestType = reply->property("requestType").toString(); 
     
-    // 处理量身定制响应 
-    if (requestType == "customized") { 
-        if (reply->error() == QNetworkReply::NoError) { 
-            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll()); 
-            if (doc.isObject() && doc.object().contains("choices")) { 
-                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject(); 
-                QJsonObject message = choice["message"].toObject(); 
-                if (message.contains("content")) { 
-                    QString response = message["content"].toString(); 
+    // 处理量身定制响应
+    if (requestType == "customized") {
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (doc.isObject() && doc.object().contains("choices")) {
+                QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
+                QJsonObject message = choice["message"].toObject();
+                if (message.contains("content")) {
+                    QString response = message["content"].toString();
 
-                    // 使用MarkdownParser处理AI回复内容 
+                    // 使用MarkdownParser处理AI回复内容
                     MarkdownParser parser;
                     QString htmlContent = parser.toHtml(response);
+
+                    // 添加AI回复到聊天窗口
+                    ui->textEditChat->append("<div style='text-align:left;'><span style='background-color:#E1F5FE;padding:5px;border-radius:5px;'>" + htmlContent + "</span></div>");
                     
-                    // 查找对应的聊天历史
-                    int historyIndex = -1;
-                    for (int i = 0; i < chatHistories.size(); ++i) {
+                    // 自动滚动到底部
+                    QScrollBar *scrollBar = ui->textEditChat->verticalScrollBar();
+                    scrollBar->setValue(scrollBar->maximum());
+                    
+                    // 查找对应的聊天历史并添加AI回复
+                    bool found = false;
+                    for (int i = 0; i < chatHistories.size(); i++) {
                         if (chatHistories[i]["id"].toString() == chatId) {
-                            historyIndex = i;
+                            found = true;
+                            // 创建AI回复消息对象
+                            QJsonObject aiMessage;
+                            aiMessage["role"] = "assistant";
+                            aiMessage["content"] = response;
+                            
+                            // 添加到会话消息数组
+                            QJsonArray messages = chatHistories[i]["messages"].toArray();
+                            messages.append(aiMessage);
+                            chatHistories[i]["messages"] = messages;
+                            
+                            // 保存聊天历史
+                            saveChatHistory();
                             break;
                         }
                     }
                     
-                    // 将AI回复添加到聊天窗口
-                    ui->textEditChat->append("<div style='text-align:left;'><span style='background-color:#E1F5FE;padding:5px;border-radius:5px;'>" + htmlContent + "</span></div>");
-                    
-                    // 将AI回复保存到聊天历史
-                    if (historyIndex != -1) {
-                        QJsonObject aiMessage;
-                        aiMessage["role"] = "assistant";
-                        aiMessage["content"] = response;
-                        
-                        QJsonArray messages = chatHistories[historyIndex]["messages"].toArray();
-                        messages.append(aiMessage);
-                        chatHistories[historyIndex]["messages"] = messages;
-                        
-                        // 保存聊天历史
-                        saveChatHistory();
+                    // 如果没有找到对应的聊天历史，输出错误信息
+                    if (!found) {
+                        qDebug() << "Error: Could not find chat history for ID:" << chatId;
                     }
                 }
             }
         } else {
-            // 处理错误情况
-            ui->textEditChat->append("<div style='color:red;'>请求失败: " + reply->errorString() + "</div>");
+                        // 处理网络错误...
+                        qDebug() << "Network Error:" << reply->errorString();
+                        // 确保只在当前显示的会话是这个chatId时才更新UI
+                       if (currentChatId == chatId) {
+                           ui->textEditChat->append("<div style='text-align:left; color: red;'>网络错误: " + reply->errorString() + "</div>");
+                           // 滚动到底部
+                           ui->textEditChat->verticalScrollBar()->setValue(ui->textEditChat->verticalScrollBar()->maximum());
+                       }
         }
     } else if (requestType == "optimization") { 
         // 处理优化响应 
@@ -1767,6 +1824,8 @@ void PieChartWidget::setHobbiesWithWeights(const QList<QPair<QString, int>> &hob
     update(); // 触发重绘
 }
 void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
+        // 保存当前会话ID到请求ID
+        requestChatId = currentChatId;
     // 设置加载状态
     isLoading = true;
     rotationAnimation->start();
@@ -1794,10 +1853,42 @@ void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
     
     QNetworkRequest request(QUrl("https://api.deepseek.com/v1/chat/completions"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8().data());
+    request.setRawHeader("Authorization", ("Bearer " + apiKey).toUtf8());
     
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
     reply->setProperty("requestType", "customized");
     reply->setProperty("originalInput", prompt);
+}
+
+void MainWindow::showThinkingProcess()
+{
+    if (!isLoading || currentThinkingStep >= thinkingSteps.size()) {
+        return;
+    }
+    
+    // 获取当前聊天内容
+    QString currentHtml = ui->textEditChat->toHtml();
+    
+    // 移除之前的思考过程（如果有）
+    QRegularExpression thinkingRegex("<div class=\"thinking-process\">.*?</div>");
+    currentHtml.replace(thinkingRegex, "");
+    
+    // 添加新的思考过程
+    QString thinkingHtml = "<div class=\"thinking-process\" style=\"color:#666;font-style:italic;margin:10px 0;\">";
+    thinkingHtml += thinkingSteps[currentThinkingStep];
+    thinkingHtml += "</div>";
+    
+    // 更新聊天内容
+    currentHtml += thinkingHtml;
+        // 修改这一行，将 textBrowserChat 改为 textEditChat
+        ui->textEditChat->setHtml(currentHtml);
+    
+    // 滚动到底部
+        // 修改这一行，将 textBrowserChat 改为 textEditChat
+        QScrollBar *scrollBar = ui->textEditChat->verticalScrollBar();
+    scrollBar->setValue(scrollBar->maximum());
+    
+    // 更新思考步骤
+    currentThinkingStep = (currentThinkingStep + 1) % thinkingSteps.size();
 }
 
