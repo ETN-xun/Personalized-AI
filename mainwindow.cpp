@@ -975,9 +975,6 @@ void MainWindow::mouseDoubleClickEvent(QMouseEvent *event) {
 // 新增：创建问题按钮
 void MainWindow::createQuestionButtons() {
     // 如果用户已经提问，则不创建按钮
-    if (hasAskedQuestion) {
-        return;
-    }
     
     // 重置按钮显示状态
     buttonsShown = true;
@@ -1165,12 +1162,7 @@ void MainWindow::createQuestionButtons() {
             }
         });
         
-        if(!hasAskedQuestion)
-        {
             btn->show();
-        }else{
-            btn->hide();
-        }
         questionButtons.append(btn);
     }
     // 添加回这三行代码，确保加载动画停止
@@ -1533,6 +1525,7 @@ void MainWindow::openCustomizePage()
 // 新增：创建新会话
 void MainWindow::createNewChat()
 {
+    createQuestionButtons();
     // 生成唯一ID
     QString chatId = QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
     
@@ -1860,35 +1853,46 @@ void MainWindow::sendCustomizedChatRequest(const QString &prompt) {
     reply->setProperty("originalInput", prompt);
 }
 
-void MainWindow::showThinkingProcess()
-{
-    if (!isLoading || currentThinkingStep >= thinkingSteps.size()) {
-        return;
-    }
-    
-    // 获取当前聊天内容
-    QString currentHtml = ui->textEditChat->toHtml();
-    
-    // 移除之前的思考过程（如果有）
-    QRegularExpression thinkingRegex("<div class=\"thinking-process\">.*?</div>");
-    currentHtml.replace(thinkingRegex, "");
-    
-    // 添加新的思考过程
-    QString thinkingHtml = "<div class=\"thinking-process\" style=\"color:#666;font-style:italic;margin:10px 0;\">";
-    thinkingHtml += thinkingSteps[currentThinkingStep];
-    thinkingHtml += "</div>";
-    
-    // 更新聊天内容
-    currentHtml += thinkingHtml;
-        // 修改这一行，将 textBrowserChat 改为 textEditChat
-        ui->textEditChat->setHtml(currentHtml);
-    
-    // 滚动到底部
-        // 修改这一行，将 textBrowserChat 改为 textEditChat
+// ... existing code ...
+
+void MainWindow::showThinkingProcess() {
+    // 确保思考步骤索引在有效范围内
+    if (currentThinkingStep < thinkingSteps.size()) {
+        // 获取当前思考步骤文本
+        QString thinkingText = thinkingSteps[currentThinkingStep];
+        
+        // 如果是第一个思考步骤，直接添加到聊天窗口
+        if (currentThinkingStep == 0) {
+            ui->textEditChat->append("<div style='color:#666666;'>" + thinkingText + "</div>");
+        } else {
+            // 获取当前聊天内容
+            QString currentHtml = ui->textEditChat->toHtml();
+            
+            // 查找并替换最后一个思考步骤
+            int lastThinkingIndex = currentHtml.lastIndexOf("<div style='color:#666666;'>");
+            if (lastThinkingIndex != -1) {
+                int endIndex = currentHtml.indexOf("</div>", lastThinkingIndex) + 6;
+                QString beforeThinking = currentHtml.left(lastThinkingIndex);
+                QString afterThinking = currentHtml.mid(endIndex);
+                
+                // 构建新的HTML内容，替换最后一个思考步骤
+                QString newHtml = beforeThinking + 
+                                 "<div style='color:#666666;'>" + thinkingText + "</div>" + 
+                                 afterThinking;
+                
+                // 设置新的HTML内容
+                ui->textEditChat->setHtml(newHtml);
+            }
+        }
+        
+        // 增加思考步骤计数器
+        currentThinkingStep++;
+        
+        // 滚动到底部
         QScrollBar *scrollBar = ui->textEditChat->verticalScrollBar();
-    scrollBar->setValue(scrollBar->maximum());
-    
-    // 更新思考步骤
-    currentThinkingStep = (currentThinkingStep + 1) % thinkingSteps.size();
+        scrollBar->setValue(scrollBar->maximum());
+    }
 }
+
+// ... existing code ...
 
