@@ -721,8 +721,8 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                         }
                         
                         // 添加AI回复到聊天窗口 
-                        ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold;'>AI助手:</div>"); 
-                        ui->textEditChat->append("<div style='margin-left:10px;'>" + htmlContent + "</div>"); 
+                        ui->textEditChat->append("<div style='color:#E91E63; font-weight:bold; text-align:left;'>AI助手:</div>"); 
+                        ui->textEditChat->append("<div style='margin-left:10px; text-align:left;'>" + htmlContent + "</div>"); 
                     }
                 } 
             } 
