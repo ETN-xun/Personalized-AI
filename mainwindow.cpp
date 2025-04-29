@@ -920,6 +920,36 @@ void MainWindow::updateCursorShape(const QPoint &pos) {
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
+        // 如果窗口处于最大化状态，并且在标题栏区域按下鼠标，则直接恢复窗口大小
+        if (isMaximized() && event->position().y() <= titleBar->height()) {
+            // 获取屏幕信息
+            QScreen *screen = QGuiApplication::primaryScreen();
+            QRect screenGeometry = screen->availableGeometry();
+            
+            // 设置窗口大小为屏幕的50%
+            int width = screenGeometry.width() * 0.5;
+            int height = screenGeometry.height() * 0.6;
+            
+            // 计算新位置，使鼠标保持在标题栏的相对位置
+            int x = event->globalPosition().x() - (event->position().x() * width / geometry().width());
+            int y = screenGeometry.top();
+            
+            // 确保窗口不会超出屏幕
+            x = qMax(screenGeometry.left(), qMin(x, screenGeometry.right() - width));
+            
+            // 直接设置窗口位置和大小，不使用动画
+            setGeometry(x, y, width, height);
+            showNormal();
+            maxBtn->setText("□");
+            
+            // 设置拖动标志和位置
+            m_bDrag = true;
+            dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
+            
+            event->accept();
+            return;
+        }
+        
         // 检查是否点击在标题栏上
         if (titleBar->geometry().contains(event->pos())) {
             m_bDrag = true;
