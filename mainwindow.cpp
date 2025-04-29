@@ -382,14 +382,16 @@ MainWindow::~MainWindow() {
 
 // 新增：封装发送请求逻辑
 void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
+    // 保存当前会话ID，用于确保回复对应正确的请求
     requestChatId = currentChatId;
+    
     // 设置加载状态
     isLoading = true;
     rotationAnimation->start();
-        // 重置思考步骤计数器
-        currentThinkingStep = 0;
+    // 重置思考步骤计数器
+    currentThinkingStep = 0;
 
-            // 开始显示思考过程
+    // 开始显示思考过程
     showThinkingProcess();
     thinkingTimer->start(1500); // 每1.5秒更新一次思考过程
     
@@ -413,7 +415,7 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
     
     QJsonObject json{
                      {"model", "deepseek-chat"},
-                     {"temperature", 0.5},
+                     {"temperature", 0.7},
                      {"max_tokens", 2048},
                      };
 
@@ -427,9 +429,32 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
         };
     } else {
         // 构建正常聊天请求的messages数组
-        messages = {
-            QJsonObject{{"role", "user"}, {"content", question}}
-        };
+        // 添加系统消息
+        QJsonObject systemMessage;
+        systemMessage["role"] = "system";
+        
+        // 根据用户性别和兴趣爱好定制系统提示
+        QString systemPrompt = "你是一个友好的AI助手";
+        if (userGender == "男") {
+            systemPrompt += "，请以男性用户喜欢的方式回答问题";
+        } else if (userGender == "女") {
+            systemPrompt += "，请以女性用户喜欢的方式回答问题";
+        }
+        
+        // 添加兴趣爱好相关的提示
+        if (!userHobbies.isEmpty()) {
+            systemPrompt += "。用户的兴趣爱好包括: " + userHobbies.join(", ");
+            systemPrompt += "。在合适的情况下，可以结合这些兴趣爱好来回答问题。";
+        }
+        
+        systemMessage["content"] = systemPrompt;
+        messages.append(systemMessage);
+        
+        // 添加用户消息
+        QJsonObject userMsg;
+        userMsg["role"] = "user";
+        userMsg["content"] = question;
+        messages.append(userMsg);
     }
 
     json["messages"] = messages; // 正确赋值给QJsonObject
