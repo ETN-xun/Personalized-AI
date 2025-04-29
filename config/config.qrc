@@ -1,5 +1,0 @@
-<RCC>
-    <qresource prefix="/">
-        <file>topics.json</file>
-    </qresource>
-</RCC>
