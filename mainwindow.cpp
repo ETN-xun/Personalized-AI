@@ -920,147 +920,130 @@ void MainWindow::updateCursorShape(const QPoint &pos) {
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
-        // 如果窗口处于最大化状态，并且在标题栏区域按下鼠标，则直接恢复窗口大小
-        if (isMaximized() && event->position().y() <= titleBar->height()) {
-            // 获取屏幕信息
-            QScreen *screen = QGuiApplication::primaryScreen();
-            QRect screenGeometry = screen->availableGeometry();
-            
-            // 设置窗口大小为屏幕的50%
-            int width = screenGeometry.width() * 0.5;
-            int height = screenGeometry.height() * 0.6;
-            
-            // 计算新位置，使鼠标保持在标题栏的相对位置
-            int x = event->globalPosition().x() - (event->position().x() * width / geometry().width());
-            int y = screenGeometry.top();
-            
-            // 确保窗口不会超出屏幕
-            x = qMax(screenGeometry.left(), qMin(x, screenGeometry.right() - width));
-            
-            // 直接设置窗口位置和大小，不使用动画
-            setGeometry(x, y, width, height);
-            showNormal();
-            maxBtn->setText("□");
-            
-            // 设置拖动标志和位置
-            m_bDrag = true;
-            dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
-            
-            event->accept();
-            return;
-        }
+        // 记录鼠标按下位置
+        dragPos = event->position().toPoint();
         
-        // 检查是否点击在标题栏上
+        // 记录全局位置，用于计算移动距离
+        QPoint globalPos = event->globalPosition().toPoint();
+        resizeStartPos = globalPos;
+        
+        // 检查是否在标题栏区域
         if (titleBar->geometry().contains(event->pos())) {
             m_bDrag = true;
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-            dragPos = event->globalPos() - frameGeometry().topLeft();
-#else
-            dragPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
-#endif
-            event->accept();
-            return;
-        }
-        
-        // 检查是否点击在窗口边缘（用于调整大小）
-        mousePressRegion = static_cast<Direction>(getMouseRegion(event->pos()));
-        if (mousePressRegion != NONE) {
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-            resizeStartPos = event->globalPos();
-#else
-            resizeStartPos = event->globalPosition().toPoint();
-#endif
-            resizeStartGeom = geometry();
-            event->accept();
-            return;
+        } else {
+            // 检查是否在窗口边缘，用于调整大小
+            mousePressRegion = static_cast<Direction>(getMouseRegion(event->pos()));
+            if (mousePressRegion != NONE) {
+                resizeStartGeom = geometry();
+            }
         }
     }
     QMainWindow::mousePressEvent(event);
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
-    if (event->buttons() & Qt::LeftButton) {
-        if (m_bDrag) {
-            // 检查窗口是否最大化
-            if (isMaximized()) {
-                // 当窗口最大化且用户拖动标题栏时，执行恢复操作
-                QRect startGeom = geometry();
-                
-                // 计算恢复后窗口的位置，使鼠标位于标题栏的相对位置
-                QPoint globalPos = event->globalPosition().toPoint();
-                double widthRatio = (double)(event->position().x()) / titleBar->width();
-                
-                // 恢复窗口
-                toggleMaximize();
-                
-                // 调整窗口位置，使鼠标保持在标题栏的相对位置
-                QRect newGeom = geometry();
-                int newX = globalPos.x() - (int)(newGeom.width() * widthRatio);
-                move(newX, newGeom.y());
-                
-                // 开始拖动恢复后的窗口
-                dragPos = QPoint(event->position().x(), event->position().y());
-            } else {
-                // 正常拖动窗口
-                move(event->globalPosition().toPoint() - dragPos);
-            }
-        }else if (mousePressRegion != NONE) {
-        QPoint delta;
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-        delta = event->globalPos() - resizeStartPos;
-#else
-        delta = event->globalPosition().toPoint() - resizeStartPos;
-#endif
-
-        QRect newGeom = resizeStartGeom;
-        switch (mousePressRegion) {
-        case RIGHT_BOTTOM:
-            newGeom.setWidth(newGeom.width() + delta.x());
-            newGeom.setHeight(newGeom.height() + delta.y());
-            break;
-        case RIGHT:
-            newGeom.setWidth(newGeom.width() + delta.x());
-            break;
-        case DOWN:
-            newGeom.setHeight(newGeom.height() + delta.y());
-            break;
-        case LEFT_BOTTOM:
-            newGeom.setLeft(newGeom.left() + delta.x());
-            newGeom.setHeight(newGeom.height() + delta.y());
-            break;
-        case LEFT_TOP:
-            newGeom.setTopLeft(newGeom.topLeft() + delta);
-            break;
-        case RIGHT_TOP:
-            newGeom.setTopRight(newGeom.topRight() + QPoint(newGeom.topRight().x() + delta.x(), newGeom.topRight().y() + delta.y()));
-            newGeom.setHeight(newGeom.height() + delta.y());
-            break;
-        case LEFT:
-            newGeom.setLeft(newGeom.left() + delta.x());
-            newGeom.setWidth(newGeom.width() - delta.x()); // 左侧缩放需要调整宽度
-            break;
-        case UP:
-            newGeom.setTop(newGeom.top() + delta.y());
-            newGeom.setHeight(newGeom.height() - delta.y());
-            break;
-        }
-
-        // 最小尺寸限制
-        if (newGeom.width() < 200) newGeom.setWidth(200);
-        if (newGeom.height() < 150) newGeom.setHeight(150);
-
-        setGeometry(newGeom);
-    }
- } else {
-        updateCursorShape(event->pos());
-        if (m_bDrag) {
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-            move(event->globalPos() - dragPos);
-#else
-            move(event->globalPosition().toPoint() - dragPos);
-#endif
+    if (isMaximized()) {
+        if (event->buttons() & Qt::LeftButton && m_bDrag) {
+            // 当窗口最大化时，拖拽应该立即恢复窗口并移动到鼠标位置
+            QPoint globalPos = event->globalPosition().toPoint();
+            
+            // 计算恢复后的窗口大小（使用屏幕的一半宽度和60%高度）
+            QScreen *screen = windowHandle()->screen();
+            QRect screenGeometry = screen->availableGeometry();
+            int width = screenGeometry.width() * 0.5;
+            int height = screenGeometry.height() * 0.6;
+            
+            // 计算窗口位置，使鼠标保持在标题栏的相对位置
+            double widthRatio = static_cast<double>(dragPos.x()) / this->width();
+            int newX = globalPos.x() - (int)(width * widthRatio);
+            int newY = globalPos.y() - dragPos.y();
+            
+            // 直接设置窗口几何形状，不使用动画
+            setGeometry(newX, newY, width, height);
+            
+            // 更新最大化按钮图标
+            maxBtn->setText("□");
+            setWindowState(Qt::WindowNoState);
+            
             event->accept();
+            return;
         }
+    }
+    
+    // 非最大化状态下的原有逻辑
+    if (event->buttons() & Qt::LeftButton) {
+        if (mousePressRegion != NONE) {
+            // 调整窗口大小
+            QPoint globalPos = event->globalPosition().toPoint();
+            QRect newGeom = resizeStartGeom;
+            
+            switch (mousePressRegion) {
+                case LEFT: {
+                    int newWidth = newGeom.right() - globalPos.x() + 1;
+                    if (newWidth > minimumWidth()) {
+                        newGeom.setLeft(globalPos.x());
+                    }
+                    break;
+                }
+                case RIGHT: {
+                    newGeom.setRight(globalPos.x());
+                    break;
+                }
+                case UP: {
+                    int newHeight = newGeom.bottom() - globalPos.y() + 1;
+                    if (newHeight > minimumHeight()) {
+                        newGeom.setTop(globalPos.y());
+                    }
+                    break;
+                }
+                case DOWN: {
+                    newGeom.setBottom(globalPos.y());
+                    break;
+                }
+                case LEFT_TOP: {
+                    int newWidth = newGeom.right() - globalPos.x() + 1;
+                    int newHeight = newGeom.bottom() - globalPos.y() + 1;
+                    if (newWidth > minimumWidth()) {
+                        newGeom.setLeft(globalPos.x());
+                    }
+                    if (newHeight > minimumHeight()) {
+                        newGeom.setTop(globalPos.y());
+                    }
+                    break;
+                }
+                case LEFT_BOTTOM: {
+                    int newWidth = newGeom.right() - globalPos.x() + 1;
+                    if (newWidth > minimumWidth()) {
+                        newGeom.setLeft(globalPos.x());
+                    }
+                    newGeom.setBottom(globalPos.y());
+                    break;
+                }
+                case RIGHT_TOP: {
+                    newGeom.setRight(globalPos.x());
+                    int newHeight = newGeom.bottom() - globalPos.y() + 1;
+                    if (newHeight > minimumHeight()) {
+                        newGeom.setTop(globalPos.y());
+                    }
+                    break;
+                }
+                case RIGHT_BOTTOM: {
+                    newGeom.setRight(globalPos.x());
+                    newGeom.setBottom(globalPos.y());
+                    break;
+                }
+                default:
+                    break;
+            }
+            
+            setGeometry(newGeom);
+        } else if (m_bDrag) {
+            // 移动窗口
+            QPoint globalPos = event->globalPosition().toPoint();
+            move(globalPos - dragPos);
+        }
+    } else {
+        updateCursorShape(event->pos());
     }
 }
 
