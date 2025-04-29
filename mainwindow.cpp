@@ -1675,7 +1675,9 @@ void MainWindow::createNewChat()
             
             // 如果删除的是当前会话，创建一个新会话
             if (isCurrentChat) {
-                createNewChat();
+                if (chatHistories.isEmpty()) {
+                    createNewChat();
+                }
             }
         }
     });
