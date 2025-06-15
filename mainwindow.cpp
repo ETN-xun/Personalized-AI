@@ -465,13 +465,6 @@ void MainWindow::sendChatRequest(const QString &question, bool isOptimization) {
 
     QNetworkReply *reply = networkManager->post(request, QJsonDocument(json).toJson());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        // 停止加载动画
-        /*
-        isLoading = false;
-        rotationAnimation->stop();
-        loadIndicator->clear();
-        */
-        // ... existing code ...
     });
     reply->setProperty("requestType", isOptimization ? "optimization" : "chat");
     reply->setProperty("originalInput", question);
@@ -639,6 +632,7 @@ void MainWindow::onReplyFinished(QNetworkReply *reply) {
                 QJsonObject choice = doc.object()["choices"].toArray().at(0).toObject();
                 QJsonObject message = choice["message"].toObject();
                 if (message.contains("content")) {
+                    // 从JSON响应中提取内容并转换为HTML
                     QString response = message["content"].toString();
 
                     // 使用MarkdownParser处理AI回复内容
